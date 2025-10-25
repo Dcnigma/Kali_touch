@@ -62,6 +62,7 @@ class OverlayLauncher(QWidget):
 
         self.screen_width = screen_width
         self.screen_height = screen_height
+        self.apps_dict = apps
         self.apps = list(apps.items())
         self.current_process = None
         self.current_plugin = None
@@ -74,7 +75,7 @@ class OverlayLauncher(QWidget):
         self.overlay.setGeometry(0, 0, screen_width, screen_height)
         self.overlay.hide()
 
-        # Layout
+        # Main layout
         main_layout = QVBoxLayout()
         main_layout.setSpacing(20)
         main_layout.setContentsMargins(50, 50, 50, 50)
@@ -86,24 +87,24 @@ class OverlayLauncher(QWidget):
         main_layout.addLayout(self.grid)
         main_layout.addStretch(1)
 
-        # Navigation bar (bottom)
+        # Bottom navigation bar
         bottom_layout = QHBoxLayout()
         bottom_layout.setSpacing(50)
 
-        # Stop Launcher (bottom-left)
+        # Stop Launcher button (bottom-left)
         self.stop_btn = QPushButton("Stop Launcher")
         self.stop_btn.setFixedSize(200, 80)
         self.stop_btn.setStyleSheet("font-size: 20px; background-color: gray; color: white;")
         self.stop_btn.clicked.connect(self.stop_launcher)
         bottom_layout.addWidget(self.stop_btn, alignment=Qt.AlignmentFlag.AlignLeft)
 
-        # Page indicator (center)
+        # Page label (center)
         self.page_label = QLabel()
         self.page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.page_label.setStyleSheet("font-size: 24px; color: white;")
         bottom_layout.addWidget(self.page_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Navigation buttons (bottom-right)
+        # Navigation (bottom-right)
         nav_layout = QHBoxLayout()
         self.prev_btn = QPushButton("← Prev")
         self.prev_btn.setFixedSize(120, 80)
@@ -147,7 +148,6 @@ class OverlayLauncher(QWidget):
         self.page_label.setText(f"Page {self.page + 1} / {total_pages}")
 
     def launch_item(self, app_config):
-        # Check if it's a plugin
         if "plugin" in app_config:
             self.launch_plugin(app_config["plugin"])
         elif "cmd" in app_config:
@@ -156,12 +156,11 @@ class OverlayLauncher(QWidget):
             QMessageBox.warning(self, "Error", "Invalid app entry!")
 
     def launch_plugin(self, plugin_path):
-        """Dynamically import and start a plugin"""
         try:
             module_name, class_name = [s.strip() for s in plugin_path.split(":")]
             module = importlib.import_module(module_name)
             plugin_class = getattr(module, class_name)
-            self.current_plugin = plugin_class(self)
+            self.current_plugin = plugin_class(parent=self, apps=self.apps_dict)
             self.current_plugin.show()
             self.overlay.show()
             self.close_btn.show()
@@ -173,7 +172,7 @@ class OverlayLauncher(QWidget):
         if self.current_process:
             self.close_app()
 
-        cmd = app_config["cmd"]
+        cmd = app_config["cmd"].lower()
         self.current_process = subprocess.Popen(cmd, shell=True)
         self.overlay.show()
         self.close_btn.show()
@@ -201,10 +200,21 @@ class OverlayLauncher(QWidget):
                 parent.kill()
             except Exception:
                 pass
+
+            # Fallback for stubborn apps (like Firefox)
+            try:
+                if "firefox" in self.current_process.args[0]:
+                    subprocess.run("pkill -f firefox", shell=True)
+            except Exception:
+                pass
+
             self.current_process = None
 
         if self.current_plugin:
-            self.current_plugin.close()
+            try:
+                self.current_plugin.close()
+            except Exception:
+                pass
             self.current_plugin = None
 
     def stop_launcher(self):
