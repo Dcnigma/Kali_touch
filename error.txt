@@ -1,0 +1,13 @@
+/run_launcher.sh 
+Traceback (most recent call last):
+  File "/home/kali/overlay_launcher/launcher.py", line 199, in <module>
+    launcher = OverlayLauncher(apps, screen_width=SCREEN_W, screen_height=SCREEN_H)
+  File "/home/kali/overlay_launcher/launcher.py", line 132, in __init__
+    self.show_page()
+    ~~~~~~~~~~~~~~^^
+  File "/home/kali/overlay_launcher/launcher.py", line 143, in show_page
+    page_items = self.apps[start:end]
+                 ~~~~~~~~~^^^^^^^^^^^
+KeyError: slice(0, 9, None)
+                                                                                                                             
+┌──(kali㉿kali-raspberrypi)-[~/overlay_launcher]

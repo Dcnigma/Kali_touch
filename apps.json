@@ -1,0 +1,90 @@
+
+{
+  "Qflipper": {
+    "cmd": "/usr/bin/flatpak run --branch=stable --arch=aarch64 --command=qFlipper one.flipperzero.qFlipper",
+   "touch_icon": "icons/qflipper.png" ,   
+    "x": 100,
+    "y": 50,
+    "width": 800,
+    "height": 600
+  },
+  "mousepad": {
+    "cmd": "Mousepad",
+    "x": 0,
+    "y": 0,
+    "width": 940,
+    "height": 800
+  },
+   "Mozilla Firefox": {
+    "cmd": "firefox",
+    
+    "x": 0,
+    "y": 0,
+    "width": 940,
+    "height": 800
+  }, 
+  "Nmap Scan": {
+  "plugin": "plugins.nmap_plugin: NmapPlugin",
+  "touch_icon": "icons/qflipper.png"
+  },  
+  "Qflipper1": {
+    "cmd": "/usr/bin/flatpak run --branch=stable --arch=aarch64 --command=qFlipper one.flipperzero.qFlipper",
+    
+    "x": 100,
+    "y": 50,
+    "width": 800,
+    "height": 600
+  },
+  "mousepad1": {
+    "cmd": "Mousepad",
+    "x": 0,
+    "y": 0,
+    "width": 940,
+    "height": 800
+  },
+   "Mozilla Firefox1": {
+    "cmd": "firefox",
+    
+    "x": 0,
+    "y": 0,
+    "width": 940,
+    "height": 800
+  }, 
+  "Nmap Scan1": {
+  "plugin": "plugins.nmap_plugin: NmapPlugin"
+  },  
+  "Qflipper2": {
+    "cmd": "/usr/bin/flatpak run --branch=stable --arch=aarch64 --command=qFlipper one.flipperzero.qFlipper",
+ 
+    "x": 100,
+    "y": 50,
+    "width": 800,
+    "height": 600
+  },
+  "mousepad2": {
+    "cmd": "Mousepad",
+    "x": 0,
+    "y": 0,
+    "width": 1024,
+    "height": 800
+  },
+   "Mozilla Firefox2": {
+    "cmd": "firefox",
+    
+    "x": 0,
+    "y": 0,
+    "width": 940,
+    "height": 800
+  }, 
+  "Nmap Scan3": {
+  "plugin": "plugins.nmap_plugin: NmapPlugin"
+  },  
+  "dirbuster4": {
+    "cmd": "dirbuster",
+    
+    "x": 0,
+    "y": 0,
+    "width": 940,
+    "height": 800
+  }
+}
