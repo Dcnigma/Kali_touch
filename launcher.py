@@ -24,6 +24,7 @@ def log(*args, **kwargs):
     if DEBUG:
         print(*args, **kwargs)
 
+
 # Load apps safely
 try:
     with open(CONFIG_FILE, "r") as f:
@@ -39,6 +40,7 @@ for name, cfg in raw_apps.items():
     cfg = dict(cfg)
     cfg["name"] = name
     apps.append(cfg)
+
 
 # ---------------- Safe plugin loader ---------------- #
 def load_plugin(app_name, app_data, parent=None):
@@ -77,6 +79,7 @@ def load_plugin(app_name, app_data, parent=None):
         msg.exec()
         return None
 
+
 class FloatingCloseButton(QPushButton):
     """Fixed top-right always-on-top close button."""
     def __init__(self, callback, screen_w=SCREEN_W, margin=20):
@@ -108,6 +111,7 @@ class FloatingCloseButton(QPushButton):
         x = self._screen_w - self.width() - self._margin
         y = self._margin
         self.move(x, y)
+
 
 class OverlayLauncher(QWidget):
     def __init__(self, apps, screen_width=SCREEN_W, screen_height=SCREEN_H):
