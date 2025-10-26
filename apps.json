@@ -24,7 +24,7 @@
     "height": 800
   }, 
   "Nmap Scan": {
-  "plugin": "plugins.nmap_plugin: NmapPlugin",
+  "plugin": "plugins.nmap_plugin:NmapPlugin",
   "touch_icon": "icons/qflipper.png"
   },  
   "Qflipper1": {
@@ -51,7 +51,7 @@
     "height": 800
   }, 
   "Nmap Scan1": {
-  "plugin": "plugins.nmap_plugin: NmapPlugin"
+  "plugin": "plugins.nmap_plugin:NmapPlugin",  
   },  
   "Qflipper2": {
     "cmd": "/usr/bin/flatpak run --branch=stable --arch=aarch64 --command=qFlipper one.flipperzero.qFlipper",
@@ -76,9 +76,10 @@
     "width": 940,
     "height": 800
   }, 
-  "Nmap Scan3": {
-  "plugin": "plugins.nmap_plugin: NmapPlugin"
-  },  
+"Nmap Scan5": {
+  "plugin": "plugins.nmap_plugin:NmapPlugin",
+  "touch_icon": "icons/nmap.png"
+},
   "dirbuster4": {
     "cmd": "dirbuster",
     
