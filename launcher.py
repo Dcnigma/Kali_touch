@@ -20,11 +20,9 @@ CONFIG_FILE = "apps.json"
 SCREEN_W, SCREEN_H = 1024, 800
 DEBUG = True
 
-
 def log(*args, **kwargs):
     if DEBUG:
         print(*args, **kwargs)
-
 
 # Load apps safely
 try:
@@ -41,7 +39,6 @@ for name, cfg in raw_apps.items():
     cfg = dict(cfg)
     cfg["name"] = name
     apps.append(cfg)
-
 
 # ---------------- Safe plugin loader ---------------- #
 def load_plugin(app_name, app_data, parent=None):
@@ -80,7 +77,6 @@ def load_plugin(app_name, app_data, parent=None):
         msg.exec()
         return None
 
-
 class FloatingCloseButton(QPushButton):
     """Fixed top-right always-on-top close button."""
     def __init__(self, callback, screen_w=SCREEN_W, margin=20):
@@ -96,7 +92,8 @@ class FloatingCloseButton(QPushButton):
                 border: 2px solid rgba(255,255,255,160);
             }}
             QPushButton:hover {{ background-color: rgba(200,0,0,200); }}
-        """)
+        """
+        )
         self.clicked.connect(callback)
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
@@ -111,7 +108,6 @@ class FloatingCloseButton(QPushButton):
         x = self._screen_w - self.width() - self._margin
         y = self._margin
         self.move(x, y)
-
 
 class OverlayLauncher(QWidget):
     def __init__(self, apps, screen_width=SCREEN_W, screen_height=SCREEN_H):
@@ -257,12 +253,17 @@ class OverlayLauncher(QWidget):
                     rest = " ".join(cmd_str.split()[1:])
                     cmd_str = f"{lower_primary} {rest}".strip()
                     log(f"Auto-corrected command → {cmd_str}")
+
+            # Start the process. Keep shell=True so existing config works.
             proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
-            # Give the app a moment, then focus it (if supported)
-            QTimer.singleShot(700, lambda: self.raise_())
             self.current_process = proc
-            self.hide()  # hide launcher overlay
-            QTimer.singleShot(1000, self.show)  # reopen after 1s, optional            
+
+            # Try to focus the launched app after a short delay.
+            QTimer.singleShot(700, lambda pid=proc.pid, c=cfg: self._focus_launched_process(pid, c))
+
+            # Hide launcher (we will show it again later or when user closes)
+            self.hide()
+            QTimer.singleShot(1000, self.show)  # reopen after 1s, optional
             log(f"Launched PID {proc.pid}: {cmd_str}")
         except Exception as e:
 #            self.overlay.hide()
@@ -301,6 +302,89 @@ class OverlayLauncher(QWidget):
             pass
         self.overlay_anim.finished.connect(_on_fade_done)
         self.overlay_anim.start()
+
+    # ---------------- FOCUS HELPERS ---------------- #
+    def _focus_launched_process(self, pid, cfg, tries=6, interval_ms=400):
+        """
+        Attempt to focus the window of the launched process.
+        Several strategies are attempted in order:
+          - xdotool (search by PID or window name)
+          - wmctrl (match PID)
+        Note: On Wayland or when the application creates windows as a different process,
+        this may fail. In that case you may need to use a window-specific activation method
+        or install xdotool/wmctrl and ensure the app's process owns the window.
+        """
+        success = self._focus_window_for_pid(pid, cfg.get("name"))
+        if success:
+            log(f"[FOCUS] Focused pid {pid}")
+            return
+
+        # If focusing failed, try several times (app might still be starting, or spawn a child)
+        def _retry(attempt=[0]):  # use mutable default to capture in closure
+            attempt[0] += 1
+            # Try to find child windows/processes for the pid (some apps spawn children)
+            found = False
+            try:
+                for p in psutil.Process(pid).children(recursive=True):
+                    if self._focus_window_for_pid(p.pid, cfg.get("name")):
+                        found = True
+                        break
+            except Exception:
+                pass
+
+            if found:
+                log(f"[FOCUS] Focused child window for pid {pid}")
+                return
+
+            if attempt[0] < tries:
+                QTimer.singleShot(interval_ms, _retry)
+            else:
+                log(f"[FOCUS] Giving up focusing pid {pid} after {tries} tries. You may need xdotool/wmctrl installed or run under X11.")
+
+        QTimer.singleShot(interval_ms, _retry)
+
+    def _focus_window_for_pid(self, pid, name_hint=None):
+        """Try multiple external tools to focus a window belonging to pid (or matching name_hint)."""
+        # Strategy 1: xdotool (best option on X11)
+        if shutil.which("xdotool"):
+            try:
+                # search by pid
+                out = subprocess.run(["xdotool", "search", "--pid", str(pid)], capture_output=True, text=True)
+                winids = [l.strip() for l in out.stdout.splitlines() if l.strip()]
+                if not winids and name_hint:
+                    # fallback: search by window name (partial)
+                    out = subprocess.run(["xdotool", "search", "--name", name_hint], capture_output=True, text=True)
+                    winids = [l.strip() for l in out.stdout.splitlines() if l.strip()]
+
+                for wid in winids:
+                    # activate first match
+                    subprocess.run(["xdotool", "windowactivate", "--sync", wid])
+                    return True
+            except Exception as e:
+                log("[FOCUS][xdotool] error:", e)
+
+        # Strategy 2: wmctrl
+        if shutil.which("wmctrl"):
+            try:
+                out = subprocess.run(["wmctrl", "-lp"], capture_output=True, text=True)
+                lines = out.stdout.splitlines()
+                for line in lines:
+                    parts = line.split()
+                    if len(parts) >= 3:
+                        winid = parts[0]
+                        try:
+                            win_pid = int(parts[2])
+                        except Exception:
+                            continue
+                        if win_pid == pid or (name_hint and name_hint.lower() in line.lower()):
+                            # wmctrl expects hex window id in 0x... form; it already provides it
+                            subprocess.run(["wmctrl", "-ia", winid])
+                            return True
+            except Exception as e:
+                log("[FOCUS][wmctrl] error:", e)
+
+        # Could not focus
+        return False
 
     # ---------------- PLUGIN LAUNCH ---------------- #
     def _start_plugin_safe(self, cfg):
