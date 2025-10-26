@@ -259,7 +259,7 @@ class OverlayLauncher(QWidget):
                     log(f"Auto-corrected command → {cmd_str}")
             proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
             # Give the app a moment, then focus it (if supported)
-#            QTimer.singleShot(700, lambda: self.raise_())
+            QTimer.singleShot(700, lambda: self.raise_())
             self.current_process = proc
             self.hide()  # hide launcher overlay
             QTimer.singleShot(1000, self.show)  # reopen after 1s, optional            
