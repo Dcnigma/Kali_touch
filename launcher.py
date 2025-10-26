@@ -20,6 +20,7 @@ CONFIG_FILE = "apps.json"
 SCREEN_W, SCREEN_H = 1024, 800
 DEBUG = True
 
+
 def log(*args, **kwargs):
     if DEBUG:
         print(*args, **kwargs)
@@ -95,8 +96,7 @@ class FloatingCloseButton(QPushButton):
                 border: 2px solid rgba(255,255,255,160);
             }}
             QPushButton:hover {{ background-color: rgba(200,0,0,200); }}
-        """
-        )
+        """)
         self.clicked.connect(callback)
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
@@ -263,6 +263,7 @@ class OverlayLauncher(QWidget):
             self.current_process = proc
 
             # Try to focus the launched app after a short delay.
+            # If the app entry defines `focus_command`, run that first (highest priority).
             QTimer.singleShot(700, lambda pid=proc.pid, c=cfg: self._focus_launched_process(pid, c))
 
             # Hide launcher (we will show it again later or when user closes)
@@ -311,13 +312,26 @@ class OverlayLauncher(QWidget):
     def _focus_launched_process(self, pid, cfg, tries=6, interval_ms=400):
         """
         Attempt to focus the window of the launched process.
-        Several strategies are attempted in order:
-          - xdotool (search by PID or window name)
-          - wmctrl (match PID)
-        Note: On Wayland or when the application creates windows as a different process,
-        this may fail. In that case you may need to use a window-specific activation method
-        or install xdotool/wmctrl and ensure the app's process owns the window.
+        Strategy:
+         - If cfg defines "focus_command", run that first (highest priority).
+         - Then try xdotool/wmctrl when available (works on X11).
+         - Retry looking for child PIDs if needed.
         """
+        # If the app provides a custom focus command, try that first
+        focus_cmd = cfg.get("focus_command")
+        if focus_cmd:
+            try:
+                log(f"[FOCUS] Running custom focus_command for '{cfg.get('name')}' -> {focus_cmd}")
+                r = subprocess.run(focus_cmd, shell=True)
+                if r.returncode == 0:
+                    log("[FOCUS] focus_command succeeded")
+                    return
+                else:
+                    log(f"[FOCUS] focus_command returned {r.returncode}, falling back")
+            except Exception as e:
+                log(f"[FOCUS] focus_command error: {e}")
+
+        # Try to focus pid or window name directly
         success = self._focus_window_for_pid(pid, cfg.get("name"))
         if success:
             log(f"[FOCUS] Focused pid {pid}")
@@ -329,7 +343,8 @@ class OverlayLauncher(QWidget):
             # Try to find child windows/processes for the pid (some apps spawn children)
             found = False
             try:
-                for p in psutil.Process(pid).children(recursive=True):
+                root_proc = psutil.Process(pid)
+                for p in root_proc.children(recursive=True):
                     if self._focus_window_for_pid(p.pid, cfg.get("name")):
                         found = True
                         break
@@ -343,7 +358,7 @@ class OverlayLauncher(QWidget):
             if attempt[0] < tries:
                 QTimer.singleShot(interval_ms, _retry)
             else:
-                log(f"[FOCUS] Giving up focusing pid {pid} after {tries} tries. You may need xdotool/wmctrl installed or run under X11.")
+                log(f"[FOCUS] Giving up focusing pid {pid} after {tries} tries. Ensure xdotool/wmctrl are installed and you are on X11.")
 
         QTimer.singleShot(interval_ms, _retry)
 
@@ -431,15 +446,23 @@ class OverlayLauncher(QWidget):
         if self.current_process:
             try:
                 pid = self.current_process.pid
-                pgid = os.getpgid(pid)
-                os.killpg(pgid, signal.SIGTERM)
+                # Try to terminate the whole process group first (safer than pkill -f)
+                try:
+                    pgid = os.getpgid(pid)
+                    os.killpg(pgid, signal.SIGTERM)
+                except Exception:
+                    # fallback: try to terminate the process directly
+                    try:
+                        self.current_process.terminate()
+                    except Exception:
+                        pass
                 time.sleep(0.4)
             except Exception:
                 pass
-            try:
-                subprocess.run("pkill -f firefox", shell=True)
-            except Exception:
-                pass
+
+            # Avoid blanket pkill patterns that may kill unrelated apps.
+            # If the app requires extra cleanup, allow it to be defined in apps.json:
+            # cfg can contain "cleanup_commands": ["pkill -f somehelper"] that will be run here.
             self.current_process = None
 
         self.overlay.hide()
