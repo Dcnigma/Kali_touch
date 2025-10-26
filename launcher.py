@@ -56,7 +56,10 @@ def load_plugin(app_name, app_data, parent=None):
         module = importlib.import_module(module_name.strip())
         cls = getattr(module, class_name.strip())
         plugin_widget = cls(parent=None, apps=apps_dict, cfg=app_data)
-
+        plugin_widget.setWindowFlags(plugin_widget.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        plugin_widget.show()
+        plugin_widget.raise_()
+        plugin_widget.activateWindow()
         if hasattr(plugin_widget, "on_start"):
             try:
                 plugin_widget.on_start()
@@ -254,8 +257,12 @@ class OverlayLauncher(QWidget):
                     rest = " ".join(cmd_str.split()[1:])
                     cmd_str = f"{lower_primary} {rest}".strip()
                     log(f"Auto-corrected command → {cmd_str}")
-            proc = subprocess.Popen(cmd_str, shell=True, preexec_fn=os.setsid)
+            proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
+            # Give the app a moment, then focus it (if supported)
+#            QTimer.singleShot(700, lambda: self.raise_())
             self.current_process = proc
+            self.hide()  # hide launcher overlay
+            QTimer.singleShot(1000, self.show)  # reopen after 1s, optional            
             log(f"Launched PID {proc.pid}: {cmd_str}")
         except Exception as e:
             self.overlay.hide()
