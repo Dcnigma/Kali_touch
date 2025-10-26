@@ -132,7 +132,7 @@ class OverlayLauncher(QWidget):
         self.overlay = QWidget(self)
         self.overlay.setGeometry(0, 0, screen_width, screen_height)
         self.overlay.setStyleSheet("background-color: rgba(0,0,0,230);")
-        self.overlay.hide()
+#        self.overlay.hide()
         self.overlay_anim = QPropertyAnimation(self.overlay, b"windowOpacity", self)
 
         # Main UI
@@ -265,7 +265,7 @@ class OverlayLauncher(QWidget):
             QTimer.singleShot(1000, self.show)  # reopen after 1s, optional            
             log(f"Launched PID {proc.pid}: {cmd_str}")
         except Exception as e:
-            self.overlay.hide()
+#            self.overlay.hide()
             self.ui_container.show()
             QMessageBox.warning(self, "Launch failed", str(e))
             return
@@ -280,7 +280,7 @@ class OverlayLauncher(QWidget):
 
     def _show_close_after_app_ready(self):
         if not (self.current_process and self.current_process.poll() is None):
-            self.overlay.hide()
+#            self.overlay.hide()
             self.ui_container.show()
             return
 
@@ -291,7 +291,7 @@ class OverlayLauncher(QWidget):
         self.overlay_anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
         def _on_fade_done():
-            self.overlay.hide()
+#            self.overlay.hide()
             self.close_btn.show()
             self.raise_timer.start(100)
 
@@ -321,7 +321,7 @@ class OverlayLauncher(QWidget):
             widget.setGeometry(x, y, w, h)
             widget.show()
             self.current_plugin = widget
-            self.overlay.hide()
+#            self.overlay.hide()
             self.close_btn.show()
             self.raise_timer.start(100)
             log(f"[PLUGIN] ▶ Running '{app_name}'")
