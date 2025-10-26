@@ -50,9 +50,10 @@
     "width": 940,
     "height": 800
   }, 
-  "Nmap Scan1": {
-  "plugin": "plugins.nmap_plugin:NmapPlugin",  
-  },  
+  "Nmap Scan66": {
+  "plugin": "plugins.nmap_plugin:NmapPlugin",
+  "touch_icon": "icons/nmap.png"
+  },
   "Qflipper2": {
     "cmd": "/usr/bin/flatpak run --branch=stable --arch=aarch64 --command=qFlipper one.flipperzero.qFlipper",
  
