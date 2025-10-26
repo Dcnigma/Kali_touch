@@ -55,18 +55,29 @@ def load_plugin(app_name, app_data, parent=None):
         module_name, class_name = plugin_path.split(":")
         module = importlib.import_module(module_name.strip())
         cls = getattr(module, class_name.strip())
-        plugin_widget = cls(parent=None, apps=apps_dict, cfg=app_data)
+        # instantiate plugin passing apps mapping + cfg if plugin supports it
+        # many plugins (like your nmap) accept parent only; try both
+        try:
+            plugin_widget = cls(parent=None, apps=apps_dict, cfg=app_data)
+        except TypeError:
+            # fallback to legacy signature
+            plugin_widget = cls(parent=None)
+            # attach cfg for later use if missing
+            try:
+                plugin_widget.cfg = app_data
+            except Exception:
+                pass
+
+        # ensure plugin is on top
         plugin_widget.setWindowFlags(plugin_widget.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
-        plugin_widget.show()
-        plugin_widget.raise_()
-        plugin_widget.activateWindow()
+        # don't show here — caller may reposition; returning the widget gives caller control
         if hasattr(plugin_widget, "on_start"):
             try:
                 plugin_widget.on_start()
             except Exception as e:
                 log(f"[PLUGIN] on_start() error in {app_name}: {e}")
 
-        log(f"[PLUGIN] ✅ Loaded '{app_name}' ({plugin_path})")
+        log(f"[PLUGIN] ✅ Instantiated '{app_name}' ({plugin_path})")
         return plugin_widget
 
     except Exception as e:
@@ -127,31 +138,36 @@ class OverlayLauncher(QWidget):
         self.apps_per_page = 9
         self.current_process = None
         self.current_plugin = None
+        # remember last launched cfg for focus attempts
+        self.last_launch_cfg = None
 
-        # Overlay
+        # --- overlay that will appear above the UI and fade ---
         self.overlay = QWidget(self)
         self.overlay.setGeometry(0, 0, screen_width, screen_height)
         self.overlay.setStyleSheet("background-color: rgba(0,0,0,230);")
-#        self.overlay.hide()
+        self.overlay.hide()
         self.overlay_anim = QPropertyAnimation(self.overlay, b"windowOpacity", self)
 
-        # Main UI
+        # --- UI container (all launcher UI lives here so we can hide/show easily) ---
         self.ui_container = QWidget(self)
         self.ui_container.setGeometry(0, 0, screen_width, screen_height)
         ui_layout = QVBoxLayout(self.ui_container)
         ui_layout.setSpacing(10)
-        ui_layout.setContentsMargins(36, 20, 36, 18)
+        ui_layout.setContentsMargins(36, 20, 36, 18)  # tuned margins to fit 1024x800
 
+        # Grid area (3x3)
         self.grid = QGridLayout()
         self.grid.setSpacing(12)
         ui_layout.addLayout(self.grid)
 
+        # spacer to push bottom bar to bottom
         ui_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
-        # Bottom bar
+        # bottom bar layout (left: Stop, center: page label, right: nav)
         bottom_bar = QHBoxLayout()
         bottom_bar.setContentsMargins(8, 0, 8, 8)
 
+        # Stop launcher (bottom-left)
         self.stop_btn = QPushButton("Stop Launcher")
         self.stop_btn.setFixedSize(180, 64)
         self.stop_btn.setStyleSheet("font-size:18px; background-color:#5a5a5a; color:white; border-radius:8px;")
@@ -179,7 +195,7 @@ class OverlayLauncher(QWidget):
         bottom_bar.addWidget(self.next_btn)
         ui_layout.addLayout(bottom_bar)
 
-        # Close Button
+        # Close Button (top-right)
         self.close_btn = FloatingCloseButton(self.close_current, screen_w=screen_width, margin=16)
         self.close_btn.set_parent_parent(self)
         self.close_btn.hide()
@@ -187,10 +203,12 @@ class OverlayLauncher(QWidget):
         self.raise_timer = QTimer(self)
         self.raise_timer.timeout.connect(self._raise_close_btn)
 
+        # initial population
         self.show_page()
 
-    # ---------------- PAGE SYSTEM ---------------- #
+    # ---------- pages / grid ----------
     def show_page(self):
+        # clear grid
         for i in reversed(range(self.grid.count())):
             w = self.grid.itemAt(i).widget()
             if w:
@@ -232,12 +250,14 @@ class OverlayLauncher(QWidget):
         self.page = (self.page - 1) % total
         self.show_page()
 
-    # ---------------- LAUNCH APPS ---------------- #
+    # ---------- launch handling ----------
     def launch_app(self, cfg):
         self.close_current()
         cmd = cfg["cmd"]
+        self.last_launch_cfg = cfg  # remember for focus attempts
         self.ui_container.hide()
 
+        # show overlay with fade-in
         self.overlay.setWindowOpacity(0.0)
         self.overlay.show()
         self.overlay.raise_()
@@ -259,23 +279,20 @@ class OverlayLauncher(QWidget):
                     log(f"Auto-corrected command → {cmd_str}")
 
             # Start the process. Keep shell=True so existing config works.
-            proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
+            proc = subprocess.Popen(cmd_str, shell=True, preexec_fn=os.setsid)
             self.current_process = proc
-
-            # Try to focus the launched app after a short delay.
-            # If the app entry defines `focus_command`, run that first (highest priority).
-            QTimer.singleShot(700, lambda pid=proc.pid, c=cfg: self._focus_launched_process(pid, c))
-
-            # Hide launcher (we will show it again later or when user closes)
-            self.hide()
-            QTimer.singleShot(1000, self.show)  # reopen after 1s, optional
             log(f"Launched PID {proc.pid}: {cmd_str}")
         except Exception as e:
-#            self.overlay.hide()
+            log("Launch failed:", e)
+            self.overlay.hide()
             self.ui_container.show()
             QMessageBox.warning(self, "Launch failed", str(e))
             return
 
+        # Try to focus the launched app after a short delay.
+        QTimer.singleShot(700, lambda pid=proc.pid, c=cfg: self._focus_launched_process(pid, c))
+
+        # Poll for app windows then fade overlay out (but only hide overlay after focus attempt)
         QTimer.singleShot(500, self._poll_for_running)
 
     def _poll_for_running(self):
@@ -286,10 +303,21 @@ class OverlayLauncher(QWidget):
 
     def _show_close_after_app_ready(self):
         if not (self.current_process and self.current_process.poll() is None):
-#            self.overlay.hide()
+            # process died — restore UI
+            self.overlay.hide()
             self.ui_container.show()
             return
 
+        # Try one final focus attempt before fading overlay out
+        try:
+            pid = self.current_process.pid if self.current_process else None
+            if pid and self.last_launch_cfg:
+                log("[FOCUS] final focus attempt before removing overlay")
+                self._focus_launched_process(pid, self.last_launch_cfg, tries=4, interval_ms=300)
+        except Exception:
+            pass
+
+        # fade overlay out and then hide it — the focus calls should have raised the app above overlay
         self.overlay_anim.stop()
         self.overlay_anim.setDuration(300)
         self.overlay_anim.setStartValue(self.overlay.windowOpacity())
@@ -297,7 +325,10 @@ class OverlayLauncher(QWidget):
         self.overlay_anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
         def _on_fade_done():
-#            self.overlay.hide()
+            try:
+                self.overlay.hide()
+            except Exception:
+                pass
             self.close_btn.show()
             self.raise_timer.start(100)
 
@@ -317,7 +348,6 @@ class OverlayLauncher(QWidget):
          - Then try xdotool/wmctrl when available (works on X11).
          - Retry looking for child PIDs if needed.
         """
-        # If the app provides a custom focus command, try that first
         focus_cmd = cfg.get("focus_command")
         if focus_cmd:
             try:
@@ -325,7 +355,7 @@ class OverlayLauncher(QWidget):
                 r = subprocess.run(focus_cmd, shell=True)
                 if r.returncode == 0:
                     log("[FOCUS] focus_command succeeded")
-                    return
+                    return True
                 else:
                     log(f"[FOCUS] focus_command returned {r.returncode}, falling back")
             except Exception as e:
@@ -335,12 +365,13 @@ class OverlayLauncher(QWidget):
         success = self._focus_window_for_pid(pid, cfg.get("name"))
         if success:
             log(f"[FOCUS] Focused pid {pid}")
-            return
+            return True
 
         # If focusing failed, try several times (app might still be starting, or spawn a child)
-        def _retry(attempt=[0]):  # use mutable default to capture in closure
-            attempt[0] += 1
-            # Try to find child windows/processes for the pid (some apps spawn children)
+        attempt_count = {"n": 0}
+
+        def _retry():
+            attempt_count["n"] += 1
             found = False
             try:
                 root_proc = psutil.Process(pid)
@@ -353,30 +384,29 @@ class OverlayLauncher(QWidget):
 
             if found:
                 log(f"[FOCUS] Focused child window for pid {pid}")
-                return
+                return True
 
-            if attempt[0] < tries:
+            if attempt_count["n"] < tries:
                 QTimer.singleShot(interval_ms, _retry)
             else:
-                log(f"[FOCUS] Giving up focusing pid {pid} after {tries} tries. Ensure xdotool/wmctrl are installed and you are on X11.")
+                log(f"[FOCUS] Giving up focusing pid {pid} after {tries} tries.")
+                return False
 
         QTimer.singleShot(interval_ms, _retry)
+        return False
 
     def _focus_window_for_pid(self, pid, name_hint=None):
         """Try multiple external tools to focus a window belonging to pid (or matching name_hint)."""
         # Strategy 1: xdotool (best option on X11)
         if shutil.which("xdotool"):
             try:
-                # search by pid
                 out = subprocess.run(["xdotool", "search", "--pid", str(pid)], capture_output=True, text=True)
                 winids = [l.strip() for l in out.stdout.splitlines() if l.strip()]
                 if not winids and name_hint:
-                    # fallback: search by window name (partial)
                     out = subprocess.run(["xdotool", "search", "--name", name_hint], capture_output=True, text=True)
                     winids = [l.strip() for l in out.stdout.splitlines() if l.strip()]
 
                 for wid in winids:
-                    # activate first match
                     subprocess.run(["xdotool", "windowactivate", "--sync", wid])
                     return True
             except Exception as e:
@@ -396,48 +426,63 @@ class OverlayLauncher(QWidget):
                         except Exception:
                             continue
                         if win_pid == pid or (name_hint and name_hint.lower() in line.lower()):
-                            # wmctrl expects hex window id in 0x... form; it already provides it
                             subprocess.run(["wmctrl", "-ia", winid])
                             return True
             except Exception as e:
                 log("[FOCUS][wmctrl] error:", e)
 
-        # Could not focus
         return False
 
     # ---------------- PLUGIN LAUNCH ---------------- #
     def _start_plugin_safe(self, cfg):
         app_name = cfg.get("name", "Unknown Plugin")
-        plugin_widget = load_plugin(app_name, cfg, parent=self)
-        if plugin_widget:
-            self.launch_plugin(app_name, plugin_widget)
+        widget = load_plugin(app_name, cfg, parent=self)
+        if widget:
+            self.launch_plugin(app_name, widget)
         else:
             self.ui_container.show()
 
     def launch_plugin(self, app_name, widget):
         try:
             widget.setWindowTitle(app_name)
-            w = int(widget.cfg.get("width", 900))
-            h = int(widget.cfg.get("height", 700))
-            x = int(widget.cfg.get("x", (self.screen_width - w) // 2))
-            y = int(widget.cfg.get("y", (self.screen_height - h) // 2))
+            # ensure plugin has cfg attribute (some plugins read widget.cfg)
+            if not hasattr(widget, "cfg"):
+                try:
+                    widget.cfg = {}
+                except Exception:
+                    pass
+            # size & pos
+            w = int(widget.cfg.get("width", 900)) if hasattr(widget, "cfg") else int(900)
+            h = int(widget.cfg.get("height", 700)) if hasattr(widget, "cfg") else int(700)
+            x = int(widget.cfg.get("x", (self.screen_width - w) // 2)) if hasattr(widget, "cfg") else (self.screen_width - w) // 2
+            y = int(widget.cfg.get("y", (self.screen_height - h) // 2)) if hasattr(widget, "cfg") else (self.screen_height - h) // 2
             widget.setGeometry(x, y, w, h)
+            widget.setWindowFlags(widget.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
             widget.show()
+            widget.raise_()
+            try:
+                widget.activateWindow()
+            except Exception:
+                pass
             self.current_plugin = widget
-#            self.overlay.hide()
+            self.overlay.hide()
             self.close_btn.show()
             self.raise_timer.start(100)
             log(f"[PLUGIN] ▶ Running '{app_name}'")
         except Exception as e:
             log(f"[PLUGIN] ⚠ Error running '{app_name}': {e}")
             QMessageBox.critical(self, "Plugin Error", str(e))
+            self.ui_container.show()
 
-    # ---------------- CLEANUP ---------------- #
+    # ---------- close / cleanup ----------
     def close_current(self):
         if self.current_plugin:
             try:
                 if hasattr(self.current_plugin, "on_close"):
-                    self.current_plugin.on_close()
+                    try:
+                        self.current_plugin.on_close()
+                    except Exception as e:
+                        log("plugin.on_close error:", e)
                 self.current_plugin.close()
             except Exception as e:
                 log("Error closing plugin:", e)
@@ -446,12 +491,11 @@ class OverlayLauncher(QWidget):
         if self.current_process:
             try:
                 pid = self.current_process.pid
-                # Try to terminate the whole process group first (safer than pkill -f)
+                # Try to terminate the whole process group first
                 try:
                     pgid = os.getpgid(pid)
                     os.killpg(pgid, signal.SIGTERM)
                 except Exception:
-                    # fallback: try to terminate the process directly
                     try:
                         self.current_process.terminate()
                     except Exception:
@@ -460,12 +504,58 @@ class OverlayLauncher(QWidget):
             except Exception:
                 pass
 
-            # Avoid blanket pkill patterns that may kill unrelated apps.
-            # If the app requires extra cleanup, allow it to be defined in apps.json:
-            # cfg can contain "cleanup_commands": ["pkill -f somehelper"] that will be run here.
+            # psutil fallback
+            try:
+                parent = psutil.Process(pid)
+                children = parent.children(recursive=True)
+                for c in children:
+                    try:
+                        c.kill()
+                    except Exception:
+                        pass
+                try:
+                    parent.kill()
+                except Exception:
+                    pass
+                gone, alive = psutil.wait_procs([parent] + children, timeout=2)
+                for p in alive:
+                    try:
+                        p.kill()
+                    except Exception:
+                        pass
+            except psutil.NoSuchProcess:
+                pass
+            except Exception as e:
+                log("psutil cleanup error:", e)
+
+            # best-effort fallback by token
+            try:
+                try:
+                    cmdline = self.current_process.args if hasattr(self.current_process, "args") else ""
+                except Exception:
+                    cmdline = ""
+                if isinstance(cmdline, (list, tuple)):
+                    cmd_str = " ".join(cmdline)
+                else:
+                    cmd_str = str(cmdline)
+                token = ""
+                if cmd_str:
+                    token = os.path.basename(cmd_str.split()[0]).lower()
+                if token:
+                    if "firefox" in token:
+                        subprocess.run("pkill -f firefox", shell=True)
+                    else:
+                        subprocess.run(f"pkill -f {token}", shell=True)
+            except Exception as e:
+                log("pkill fallback error:", e)
+
             self.current_process = None
 
-        self.overlay.hide()
+        # restore UI & hide overlay/close button
+        try:
+            self.overlay.hide()
+        except Exception:
+            pass
         self.ui_container.show()
         self.close_btn.hide()
         self.raise_timer.stop()
@@ -473,6 +563,7 @@ class OverlayLauncher(QWidget):
     def _raise_close_btn(self):
         if self.close_btn.isVisible():
             self.close_btn.raise_()
+            self.close_btn.activateWindow()
         else:
             self.raise_timer.stop()
 
