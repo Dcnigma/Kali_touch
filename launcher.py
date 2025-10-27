@@ -376,14 +376,15 @@ class OverlayLauncher(QWidget):
     def _position_close_btn(self):
         """Position floating Close button relative to screen coordinates."""
         pad = 15
-        geo = self.geometry()  # absolute position of launcher window
+        geo = self.geometry()
         x = geo.x() + geo.width() - pad - self.close_btn.width()
         y = geo.y() + pad
         try:
             self.close_btn.move(x, y)
         except Exception:
             pass
-        def ensure_close_btn(self):
+    
+    def ensure_close_btn(self):
         """If close_btn doesn't exist or was deleted, recreate it."""
         if not getattr(self, "close_btn", None) or not isinstance(self.close_btn, QWidget):
             try:
@@ -479,24 +480,23 @@ class OverlayLauncher(QWidget):
             self.ui_container.show()
             return
 
-    #    QTimer.singleShot(600, self._finish_launch)
+    # Instead of fixed delay, wait for window to appear
+    QTimer.singleShot(200, self.wait_for_window)
     
-    def wait_for_window():
+def wait_for_window(self):
     try:
         if shutil.which("xdotool") and self.current_process:
             pid = self.current_process.pid
-            # check if window exists for PID
             out = subprocess.getoutput(f"xdotool search --pid {pid}")
             if out.strip():
                 log(f"[LAUNCH] Window for PID {pid} detected → showing close button.")
                 self._finish_launch()
                 return
-        # retry a few times until window appears (up to ~5 seconds)
-        if not getattr(wait_for_window, "tries", 0):
-            wait_for_window.tries = 0
-        wait_for_window.tries += 1
-        if wait_for_window.tries < 25:
-            QTimer.singleShot(200, wait_for_window)
+        if not hasattr(self, "_wait_tries"):
+            self._wait_tries = 0
+        self._wait_tries += 1
+        if self._wait_tries < 25:
+            QTimer.singleShot(200, self.wait_for_window)
         else:
             log("[LAUNCH] Timeout waiting for window; continuing anyway.")
             self._finish_launch()
