@@ -3,13 +3,16 @@ import tkinter as tk
 from tkinter import scrolledtext
 import threading
 import time
+import os, sys
+plugin_dir = os.path.dirname(os.path.abspath(__file__))
+if plugin_dir not in sys.path:
+    sys.path.insert(0, plugin_dir)
 
-# Try importing MFRC522
 try:
     import MFRC522
 except ImportError:
     MFRC522 = None
-
+    
 class MFRC522Plugin:
     def __init__(self, parent=None, *args, **kwargs):
         # Store launcher data
