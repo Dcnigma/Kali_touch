@@ -426,7 +426,32 @@ class OverlayLauncher(QWidget):
             self.ui_container.show()
             return
 
-        QTimer.singleShot(600, self._finish_launch)
+    #    QTimer.singleShot(600, self._finish_launch)
+    
+    def wait_for_window():
+    try:
+        if shutil.which("xdotool") and self.current_process:
+            pid = self.current_process.pid
+            # check if window exists for PID
+            out = subprocess.getoutput(f"xdotool search --pid {pid}")
+            if out.strip():
+                log(f"[LAUNCH] Window for PID {pid} detected → showing close button.")
+                self._finish_launch()
+                return
+        # retry a few times until window appears (up to ~5 seconds)
+        if not getattr(wait_for_window, "tries", 0):
+            wait_for_window.tries = 0
+        wait_for_window.tries += 1
+        if wait_for_window.tries < 25:
+            QTimer.singleShot(200, wait_for_window)
+        else:
+            log("[LAUNCH] Timeout waiting for window; continuing anyway.")
+            self._finish_launch()
+    except Exception as e:
+        log(f"[LAUNCH] wait_for_window error: {e}")
+        self._finish_launch()
+
+wait_for_window()
 
     def _finish_launch(self):
         self.move(0, 0)
