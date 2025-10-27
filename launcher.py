@@ -275,11 +275,17 @@ class OverlayLauncher(QWidget):
         ui_layout.setSpacing(10)
         ui_layout.setContentsMargins(36, 20, 36, 18)
 
+        # --- Add top spacer to push apps lower (≈50px) ---
+        ui_layout.addSpacerItem(QSpacerItem(0, 50, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed))
+
+        # App grid
         self.grid = QGridLayout()
         self.grid.setSpacing(12)
         ui_layout.addLayout(self.grid)
         ui_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
+        # Add stretch below grid so bottom bar stays near the bottom
+        ui_layout.addStretch(1)
+        
         # Bottom bar
         bottom_bar = QHBoxLayout()
         bottom_bar.setContentsMargins(8, 0, 8, 8)
