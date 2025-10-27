@@ -12,10 +12,10 @@ from time import sleep
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QPushButton, QGridLayout, QLabel,
     QHBoxLayout, QVBoxLayout, QSpacerItem, QSizePolicy, QMessageBox,
-    QDialog, QComboBox, QFormLayout, QDialogButtonBox
+    QDialog, QComboBox, QFormLayout, QDialogButtonBox, QGraphicsOpacityEffect
 )
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QSize
-from PyQt6.QtGui import QPixmap, QIcon, QGuiApplication
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QSize, QEasingCurve
+from PyQt6.QtGui import QPixmap, QIcon, QGuiApplication, QColor, QPalette
 
 CONFIG_FILE = "apps.json"
 DEBUG = True
@@ -78,7 +78,7 @@ def load_plugin(app_name, app_data, parent=None):
         return None
 
 
-# ---------- Floating Close Button ----------
+# ---------- Floating Close Button with Fade ----------
 class FloatingCloseButton(QPushButton):
     def __init__(self, callback, parent=None):
         super().__init__("✕", parent=parent)
@@ -101,6 +101,29 @@ class FloatingCloseButton(QPushButton):
             Qt.WindowType.Tool
         )
 
+        # Fade effect
+        self.fade_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self.fade_effect)
+        self.anim = QPropertyAnimation(self.fade_effect, b"opacity")
+        self.anim.setDuration(300)
+        self.anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
+
+    def fade_in(self):
+        self.show()
+        self.anim.stop()
+        self.anim.setStartValue(0.0)
+        self.anim.setEndValue(1.0)
+        self.anim.start()
+
+    def fade_out(self):
+        def hide_after():
+            self.hide()
+        self.anim.stop()
+        self.anim.setStartValue(1.0)
+        self.anim.setEndValue(0.0)
+        self.anim.finished.connect(hide_after)
+        self.anim.start()
+
 
 # ---------- Settings Dialog ----------
 class SettingsDialog(QDialog):
@@ -113,7 +136,7 @@ class SettingsDialog(QDialog):
         layout = QFormLayout(self)
 
         self.theme_cb = QComboBox()
-        self.theme_cb.addItems(["Default", "Dark", "Light"])
+        self.theme_cb.addItems(["Dark", "Light"])
         layout.addRow("Theme:", self.theme_cb)
 
         self.sort_cb = QComboBox()
@@ -132,7 +155,7 @@ class SettingsDialog(QDialog):
             try:
                 with open(self.settings_path, "r") as f:
                     s = json.load(f)
-                self.theme_cb.setCurrentText(s.get("theme", "Default"))
+                self.theme_cb.setCurrentText(s.get("theme", "Dark"))
                 self.sort_cb.setCurrentText(s.get("sort", "By name"))
             except Exception:
                 pass
@@ -150,19 +173,53 @@ class SettingsDialog(QDialog):
         super().accept()
 
 
+# ---------- Startup Splash Screen ----------
+class SplashScreen(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        screen = QGuiApplication.primaryScreen()
+        size = screen.size() if screen else QSize(1024, 800)
+        self.setFixedSize(size)
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.setStyleSheet("background-color: black;")
+
+        vbox = QVBoxLayout(self)
+        vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.label = QLabel("Kali Touch Launcher", self)
+        self.label.setStyleSheet("color: white; font-size: 32px; font-weight: bold;")
+        vbox.addWidget(self.label)
+
+        self.fade_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self.fade_effect)
+        self.anim = QPropertyAnimation(self.fade_effect, b"opacity")
+        self.anim.setDuration(1200)
+        self.anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
+
+    def show_splash(self, duration=1200):
+        self.show()
+        self.anim.stop()
+        self.anim.setStartValue(0.0)
+        self.anim.setEndValue(1.0)
+        self.anim.start()
+        QTimer.singleShot(duration, self.fade_out)
+
+    def fade_out(self):
+        self.anim.stop()
+        self.anim.setStartValue(1.0)
+        self.anim.setEndValue(0.0)
+        self.anim.start()
+        QTimer.singleShot(1200, self.close)
+
+
 # ---------- Main Launcher ----------
 class OverlayLauncher(QWidget):
     def __init__(self, apps):
         super().__init__()
 
         screen = QGuiApplication.primaryScreen()
-        if screen:
-            ssz = screen.size()
-            self.SCREEN_W, self.SCREEN_H = ssz.width(), ssz.height()
-        else:
-            self.SCREEN_W, self.SCREEN_H = 1024, 800
+        ssz = screen.size() if screen else QSize(1024, 800)
+        self.SCREEN_W, self.SCREEN_H = ssz.width(), ssz.height()
 
-        # ensure pinned at 0,0 so no compositor offset
         self.move(0, 0)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setFixedSize(self.SCREEN_W, self.SCREEN_H)
@@ -173,13 +230,16 @@ class OverlayLauncher(QWidget):
         self.current_process = None
         self.current_plugin = None
 
+        # Load theme
+        self.theme_file = "launcher_settings.json"
+        self.theme = self.load_theme()
+        self.apply_theme(self.theme)
+
         # Overlay background
         self.overlay = QWidget(self)
         self.overlay.setGeometry(0, 0, self.SCREEN_W, self.SCREEN_H)
         self.overlay.setStyleSheet("background-color: rgba(0,0,0,200);")
         self.overlay.hide()
-
-        self.overlay_anim = QPropertyAnimation(self.overlay, b"windowOpacity", self)
 
         # UI container
         self.ui_container = QWidget(self)
@@ -198,7 +258,7 @@ class OverlayLauncher(QWidget):
         bottom_bar = QHBoxLayout()
         bottom_bar.setContentsMargins(8, 0, 8, 8)
 
-        # Stop Launcher button (Close UI)
+        # Stop Launcher button
         self.stop_btn = QPushButton("Stop Launcher")
         self.stop_btn.setFixedSize(180, 64)
         self.stop_btn.setStyleSheet("font-size:18px; background-color:#5a5a5a; color:white; border-radius:8px;")
@@ -214,12 +274,17 @@ class OverlayLauncher(QWidget):
 
         bottom_bar.addStretch(1)
 
-        # Right side: Settings + navigation
+        # Right side: Theme + Settings + navigation
         right_container = QHBoxLayout()
 
-        # Settings button
+        self.theme_btn = QPushButton("Theme")
+        self.theme_btn.setFixedSize(120, 64)
+        self.theme_btn.setStyleSheet("font-size:16px; background-color:#2a82da; color:white; border-radius:8px;")
+        self.theme_btn.clicked.connect(self.toggle_theme)
+        right_container.addWidget(self.theme_btn)
+
         self.settings_btn = QPushButton("Settings")
-        self.settings_btn.setFixedSize(140, 64)
+        self.settings_btn.setFixedSize(120, 64)
         self.settings_btn.setStyleSheet("font-size:16px; background-color:#3d6fb3; color:white; border-radius:8px;")
         self.settings_btn.clicked.connect(self.open_settings)
         right_container.addWidget(self.settings_btn)
@@ -238,19 +303,45 @@ class OverlayLauncher(QWidget):
         right_container.addWidget(self.prev_btn)
         right_container.addWidget(self.next_btn)
         bottom_bar.addLayout(right_container)
-
         ui_layout.addLayout(bottom_bar)
 
-        # Floating close button
+        # Floating close button (fade)
         self.close_btn = FloatingCloseButton(self.close_current, parent=self)
         self.close_btn.hide()
-        self._position_close_btn()
 
         self.raise_timer = QTimer(self)
         self.raise_timer.timeout.connect(self._raise_close_btn)
 
         self.show_page()
 
+    # ---------- Theme ----------
+    def load_theme(self):
+        if os.path.exists(self.theme_file):
+            try:
+                with open(self.theme_file, "r") as f:
+                    data = json.load(f)
+                    return data.get("theme", "Dark")
+            except Exception:
+                pass
+        return "Dark"
+
+    def apply_theme(self, theme):
+        palette = QPalette()
+        if theme == "Light":
+            palette.setColor(QPalette.ColorRole.Window, QColor("#f0f0f0"))
+            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.black)
+        else:
+            palette.setColor(QPalette.ColorRole.Window, QColor("#1e1e1e"))
+            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
+        QApplication.instance().setPalette(palette)
+
+    def toggle_theme(self):
+        self.theme = "Light" if self.theme == "Dark" else "Dark"
+        self.apply_theme(self.theme)
+        with open(self.theme_file, "w") as f:
+            json.dump({"theme": self.theme}, f, indent=2)
+
+    # ---------- Layout ----------
     def _position_close_btn(self):
         pad = 15
         self.close_btn.move(self.width() - pad - self.close_btn.width(), pad)
@@ -261,7 +352,7 @@ class OverlayLauncher(QWidget):
         self._position_close_btn()
         super().resizeEvent(ev)
 
-    # ---------- Page / Settings ----------
+    # ---------- Page Handling ----------
     def show_page(self):
         for i in reversed(range(self.grid.count())):
             w = self.grid.itemAt(i).widget()
@@ -304,31 +395,22 @@ class OverlayLauncher(QWidget):
         self.page = (self.page - 1) % total
         self.show_page()
 
+    # ---------- Settings ----------
     def open_settings(self):
         dlg = SettingsDialog(self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
-            QMessageBox.information(self, "Settings", "Settings saved.")
+            self.theme = dlg.theme_cb.currentText()
+            self.apply_theme(self.theme)
 
-    # ---------- Launch app ----------
+    # ---------- App launching ----------
     def launch_app(self, cfg):
-        self.move(0, 0)  # always re-pin
+        self.move(0, 0)
         self.ui_container.move(0, 0)
         self.overlay.move(0, 0)
         self.overlay.raise_()
         self.close_btn.hide()
-
         self.ui_container.hide()
-        self.overlay.setWindowOpacity(0.0)
         self.overlay.show()
-
-        try:
-            self.overlay_anim.stop()
-            self.overlay_anim.setDuration(150)
-            self.overlay_anim.setStartValue(0.0)
-            self.overlay_anim.setEndValue(0.9)
-            self.overlay_anim.start()
-        except Exception:
-            pass
 
         try:
             cmd = cfg["cmd"]
@@ -344,17 +426,18 @@ class OverlayLauncher(QWidget):
             self.ui_container.show()
             return
 
-        QTimer.singleShot(600, lambda: self._finish_launch())
+        QTimer.singleShot(600, self._finish_launch)
 
     def _finish_launch(self):
         self.move(0, 0)
         self.ui_container.move(0, 0)
         self.overlay.move(0, 0)
         self.overlay.hide()
-        self.close_btn.show()
+        self._position_close_btn()
+        self.close_btn.fade_in()
         self.raise_timer.start(100)
 
-    # ---------- Plugin handling ----------
+    # ---------- Plugin ----------
     def _start_plugin_safe(self, cfg):
         widget = load_plugin(cfg.get("name", "Unknown"), cfg, parent=self)
         if widget:
@@ -369,11 +452,11 @@ class OverlayLauncher(QWidget):
         widget.setGeometry(x, y, w, h)
         widget.show()
         widget.raise_()
-        self.close_btn.show()
+        self.close_btn.fade_in()
         self.raise_timer.start(100)
         self.current_plugin = widget
 
-    # ---------- Close / stop ----------
+    # ---------- Close ----------
     def close_current(self):
         if self.current_plugin:
             try:
@@ -393,7 +476,7 @@ class OverlayLauncher(QWidget):
         self.ui_container.show()
         self.move(0, 0)
         self._position_close_btn()
-        self.close_btn.hide()
+        self.close_btn.fade_out()
 
     def _raise_close_btn(self):
         if self.close_btn.isVisible():
@@ -408,6 +491,12 @@ class OverlayLauncher(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+
+    # Show splash screen
+    splash = SplashScreen()
+    splash.show_splash()
+
     launcher = OverlayLauncher(apps)
-    launcher.show()
+    QTimer.singleShot(1800, launcher.show)
+
     sys.exit(app.exec())
