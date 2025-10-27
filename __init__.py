@@ -3,9 +3,9 @@
 ui_layout.addStretch(1)
 self.apps = apps  # in __init__
 self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
-self.close_btn = FloatingCloseButton(self.close_current)
-self.close_btn.hide()
-self._position_close_btn()
+# ensure close button exists (created detached from launcher window)
+self.close_btn = None
+self.ensure_close_btn()
 self.show()
 self.raise_()
 self.activateWindow()
