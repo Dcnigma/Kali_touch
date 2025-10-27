@@ -4,20 +4,30 @@ import sys
 import time
 from PyQt6 import QtWidgets, QtCore
 
-# ---------- Ensure MFRC522.py is importable ----------
-plugin_folder = os.path.dirname(os.path.abspath(__file__))
-if plugin_folder not in sys.path:
-    sys.path.insert(0, plugin_folder)
+# ---------- Auto-detect MFRC522.py ----------
+def find_mfrc522():
+    """Try to locate MFRC522.py automatically."""
+    possible_folders = [
+        os.path.dirname(os.path.abspath(__file__)),  # plugin folder
+        os.getcwd(),                                # current working dir
+    ]
+    for folder in possible_folders:
+        candidate = os.path.join(folder, "MFRC522.py")
+        if os.path.isfile(candidate):
+            if folder not in sys.path:
+                sys.path.insert(0, folder)
+            return True, folder
+    return False, None
 
-try:
+MFRC522_AVAILABLE, mfrc_folder = find_mfrc522()
+if MFRC522_AVAILABLE:
     import MFRC522
-    MFRC522_AVAILABLE = True
-except ImportError:
-    MFRC522_AVAILABLE = False
+    print(f"=== DEBUG INFO ===\nMFRC522.py found in: {mfrc_folder}\n==================")
+else:
     print("MFRC522 Python library not available on this system.")
-    print("Place MFRC522.py in the same folder as this plugin to read cards.")
+    print("Place MFRC522.py in the same folder as this plugin or launcher to read cards.")
 
-# ---------- Helper Functions ----------
+# ---------- Helper ----------
 def uidToString(uid):
     """Convert UID list to string."""
     return "".join(format(i, "02X") for i in uid)
@@ -31,7 +41,7 @@ class MFRC522Plugin(QtWidgets.QWidget):
 
         self.cfg = cfg
 
-        # UI: label
+        # UI label
         self.label = QtWidgets.QLabel("No card detected", self)
         self.label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self.label.setGeometry(50, 400, 700, 100)
@@ -39,7 +49,7 @@ class MFRC522Plugin(QtWidgets.QWidget):
         font.setPointSize(24)
         self.label.setFont(font)
 
-        # Only start RFID thread if library is available
+        # Start RFID thread if available
         if MFRC522_AVAILABLE:
             self.reader = MFRC522.MFRC522()
             self.thread = QtCore.QThread()
@@ -51,7 +61,7 @@ class MFRC522Plugin(QtWidgets.QWidget):
         else:
             self.label.setText("MFRC522.py not found!\nCannot read cards.")
 
-        # Handle closing
+        # Cleanup when closing
         self.destroyed.connect(self.cleanup)
 
     def on_card_detected(self, uid):
@@ -63,7 +73,7 @@ class MFRC522Plugin(QtWidgets.QWidget):
             self.thread.quit()
             self.thread.wait()
 
-# ---------- RFID Worker Thread ----------
+# ---------- RFID Worker ----------
 class RFIDWorker(QtCore.QObject):
     card_detected = QtCore.pyqtSignal(str)
 
