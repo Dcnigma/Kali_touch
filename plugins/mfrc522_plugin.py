@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
-# mfrc522_plugin.py
-
 import os
 import sys
 import time
-
-# Make sure MFRC522.py is in the same folder
+import threading
 try:
     from MFRC522 import MFRC522
 except ImportError:
@@ -13,33 +10,55 @@ except ImportError:
     print("Place MFRC522.py in the same folder as this plugin to read cards.")
     MFRC522 = None
 
-# Only proceed if MFRC522 is available
 if MFRC522:
-    # Initialize the reader
-    reader = MFRC522()
+    import tkinter as tk
+    from tkinter import ttk
 
-    def uidToString(uid):
-        """Convert UID list to hex string."""
-        return ''.join(format(x, '02X') for x in uid)
+    class RFIDReaderUI:
+        def __init__(self, master):
+            self.master = master
+            self.master.title("MFRC522 RFID Reader")
+            self.master.geometry("800x900")
 
-    def scan_card():
-        """Scan for a card once and return UID string if found."""
-        status, _ = reader.MFRC522_Request(reader.PICC_REQIDL)
-        if status == reader.MI_OK:
-            status, uid = reader.MFRC522_SelectTagSN()
-            if status == reader.MI_OK:
-                return uidToString(uid)
-        return None
+            self.label = tk.Label(master, text="Scan a card...", font=("Helvetica", 24))
+            self.label.pack(pady=40)
 
-    # This is an example function for the plugin UI to call repeatedly
-    def plugin_loop(update_ui_callback):
-        """
-        Call this function repeatedly from your plugin main loop.
-        update_ui_callback should be a function that takes the UID string
-        or None if no card is present.
-        """
-        while True:
-            uid = scan_card()
-            if uid:
-                update_ui_callback(uid)
-            time.sleep(0.1)  # Adjust scan frequency as needed
+            self.log_frame = tk.Frame(master)
+            self.log_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+            self.log_box = tk.Text(self.log_frame, state=tk.DISABLED, font=("Courier", 14))
+            self.log_box.pack(fill=tk.BOTH, expand=True)
+
+            self.reader = MFRC522()
+            self.continue_reading = True
+
+            # Start scanning in a separate thread
+            threading.Thread(target=self.scan_loop, daemon=True).start()
+
+        def uidToString(self, uid):
+            return ''.join(format(x, '02X') for x in uid)
+
+        def log(self, text):
+            self.log_box.config(state=tk.NORMAL)
+            self.log_box.insert(tk.END, f"{time.strftime('%H:%M:%S')} - {text}\n")
+            self.log_box.see(tk.END)
+            self.log_box.config(state=tk.DISABLED)
+
+        def scan_loop(self):
+            while self.continue_reading:
+                status, _ = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
+                if status == self.reader.MI_OK:
+                    status, uid = self.reader.MFRC522_SelectTagSN()
+                    if status == self.reader.MI_OK:
+                        uid_str = self.uidToString(uid)
+                        self.master.after(0, self.update_ui, uid_str)
+                time.sleep(0.1)
+
+        def update_ui(self, uid_str):
+            self.label.config(text=f"Card UID: {uid_str}")
+            self.log(f"Card read: {uid_str}")
+
+    if __name__ == "__main__":
+        root = tk.Tk()
+        app = RFIDReaderUI(root)
+        root.mainloop()
