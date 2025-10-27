@@ -1,78 +1,102 @@
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QGridLayout, QCheckBox, QLabel, QSpacerItem, QSizePolicy, QToolTip
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QPixmap, QClipboard
+#!/usr/bin/env python3
 import os
+import sys
+import time
+from PyQt6 import QtWidgets, QtCore
 
-ROWS, COLUMNS = 8, 2
+# ---------- Auto-detect MFRC522.py ----------
+def find_mfrc522():
+    """Try to locate MFRC522.py automatically."""
+    possible_folders = [
+        os.path.dirname(os.path.abspath(__file__)),  # plugin folder
+        os.getcwd(),                                # current working dir
+    ]
+    for folder in possible_folders:
+        candidate = os.path.join(folder, "MFRC522.py")
+        if os.path.isfile(candidate):
+            if folder not in sys.path:
+                sys.path.insert(0, folder)
+            return True, folder
+    return False, None
 
-class RFIDUI(QWidget):
-    def __init__(self):
-        super().__init__()
+MFRC522_AVAILABLE, mfrc_folder = find_mfrc522()
+if MFRC522_AVAILABLE:
+    import MFRC522
+    print(f"=== DEBUG INFO ===\nMFRC522.py found in: {mfrc_folder}\n==================")
+else:
+    print("MFRC522 Python library not available on this system.")
+    print("Place MFRC522.py in the same folder as this plugin or launcher to read cards.")
+
+# ---------- Helper ----------
+def uidToString(uid):
+    """Convert UID list to string."""
+    return "".join(format(i, "02X") for i in uid)
+
+# ---------- PyQt6 Plugin ----------
+class MFRC522Plugin(QtWidgets.QWidget):
+    def __init__(self, parent=None, apps=None, cfg=None):
+        super().__init__(parent)
         self.setWindowTitle("RFID Reader")
         self.resize(800, 900)
 
-        self.checkboxes = []
-        self.uids = [""] * (ROWS * COLUMNS)  # dummy UID list
+        self.cfg = cfg
 
-        main_layout = QVBoxLayout(self)
+        # UI label
+        self.label = QtWidgets.QLabel("No card detected", self)
+        self.label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.label.setGeometry(50, 400, 700, 100)
+        font = self.label.font()
+        font.setPointSize(24)
+        self.label.setFont(font)
 
-        # Top spacer
-        main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
-        # Logo
-        self.logo_label = QLabel(self)
-        logo_path = "logo.png"  # place logo.png in same folder
-        if os.path.exists(logo_path):
-            pixmap = QPixmap(logo_path).scaled(200, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-            self.logo_label.setPixmap(pixmap)
-            self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.logo_label, alignment=Qt.AlignmentFlag.AlignHCenter)
-
-        # Grid widget
-        self.grid_widget = QWidget()
-        self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,80); border-radius: 10px;")
-        self.grid_layout = QGridLayout()
-        self.grid_layout.setSpacing(10)
-        self.grid_widget.setLayout(self.grid_layout)
-        main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignHCenter)
-
-        for i in range(ROWS):
-            for j in range(COLUMNS):
-                idx = i * COLUMNS + j
-                cb = QCheckBox("")
-                cb.setStyleSheet("color: lightgrey; font-size: 16px;")
-                cb.uid_index = idx
-                cb.stateChanged.connect(self.checkbox_clicked)
-                self.grid_layout.addWidget(cb, i, j)
-                self.checkboxes.append(cb)
-
-        # Bottom spacer
-        main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
-    def checkbox_clicked(self, state):
-        sender = self.sender()
-        uid = self.uids[sender.uid_index]
-        if uid:
-            QApplication.clipboard().setText(uid)
-            # Show temporary tooltip
-            QToolTip.showText(sender.mapToGlobal(sender.rect().center()), "Copied!", sender)
-            QTimer.singleShot(1000, QToolTip.hideText)  # hide after 1 second
-
-    # Example function to mark UID as scanned
-    def mark_uid(self, uid):
-        if uid not in self.uids:
-            try:
-                idx = self.uids.index("")
-            except ValueError:
-                idx = 0  # overwrite oldest if full
-            self.uids[idx] = uid
+        # Start RFID thread if available
+        if MFRC522_AVAILABLE:
+            self.reader = MFRC522.MFRC522()
+            self.thread = QtCore.QThread()
+            self.worker = RFIDWorker(self.reader)
+            self.worker.moveToThread(self.thread)
+            self.thread.started.connect(self.worker.run)
+            self.worker.card_detected.connect(self.on_card_detected)
+            self.thread.start()
         else:
-            idx = self.uids.index(uid)
+            self.label.setText("MFRC522.py not found!\nCannot read cards.")
 
-        # Update checkbox colors
-        for i, cb in enumerate(self.checkboxes):
-            if i < len(self.uids) and self.uids[i] == uid:
-                cb.setStyleSheet("color: green; font-size: 16px;")
-                # Optionally move to page if using pages
-            else:
-                cb.setStyleSheet("color: lightgrey; font-size: 16px;")
+        # Cleanup when closing
+        self.destroyed.connect(self.cleanup)
+
+    def on_card_detected(self, uid):
+        self.label.setText(f"Card detected: {uid}")
+
+    def cleanup(self):
+        if MFRC522_AVAILABLE:
+            self.worker.stop()
+            self.thread.quit()
+            self.thread.wait()
+
+# ---------- RFID Worker ----------
+class RFIDWorker(QtCore.QObject):
+    card_detected = QtCore.pyqtSignal(str)
+
+    def __init__(self, reader):
+        super().__init__()
+        self.reader = reader
+        self.continue_reading = True
+
+    def run(self):
+        while self.continue_reading:
+            (status, _) = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
+            if status == self.reader.MI_OK:
+                (status, uid) = self.reader.MFRC522_SelectTagSN()
+                if status == self.reader.MI_OK:
+                    self.card_detected.emit(uidToString(uid))
+            time.sleep(0.5)
+
+    def stop(self):
+        self.continue_reading = False
+
+# ---------- Standalone Launch ----------
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    window = MFRC522Plugin()
+    window.show()
+    sys.exit(app.exec())
