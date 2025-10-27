@@ -3,15 +3,13 @@
 Touchscreen-friendly MFRC522 RFID reader plugin for a PyQt6 launcher.
 - Exposes class `MFRC522Plugin(QWidget)` so the launcher's plugin loader can instantiate it
   with the same optional signature used in your other plugins: (parent=None, apps=None, cfg=None).
-- Window size is set to 900x800 as requested.
+- Window size is set to 900x800.
 - Console-like QTextEdit displays card UID reads in a human-friendly format.
 
 Notes:
-- This code expects the original `MFRC522` Python module the user provided in their example to be
-  importable on the target system (typically a Raspberry Pi with an MFRC522 module).
-- The reader runs in a QThread to avoid blocking the UI. The thread polls the reader and emits
-  signals when a UID is detected.
-- Place this file in your `plugins/` folder alongside other plugins and import/instantiate it from the launcher.
+- Expects the MFRC522 Python module and SPI hardware to be available (Raspberry Pi).
+- The reader runs in a QThread to avoid blocking the UI.
+- Plugin now auto-detects SPI availability and gives clearer messages if hardware is missing.
 """
 
 import os
@@ -19,12 +17,12 @@ import datetime
 from typing import Optional
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton, QMessageBox
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
 
-# Try to import MFRC522, but keep plugin import-safe if library is not available.
+# Try to import MFRC522 safely
 try:
     import MFRC522  # type: ignore
     HAS_MFRC = True
@@ -32,22 +30,25 @@ except Exception:
     MFRC522 = None
     HAS_MFRC = False
 
+# Additional SPI check (for Raspberry Pi)
+try:
+    import spidev  # type: ignore
+    SPI_AVAILABLE = True
+except Exception:
+    SPI_AVAILABLE = False
+
 
 def uidToString(uid):
-    """Convert list/tuple of bytes to uppercase hex string (e.g. [0xDE,0xAD,0xBE,0xEF] -> DEADBEEF)."""
     s = ""
     try:
         for i in uid:
             s = format(i, "02X") + s
     except Exception:
-        # Fallback: stringify
         s = str(uid)
     return s
 
 
 class MFRC522ReaderThread(QThread):
-    """Background thread that polls the MFRC522 reader and emits UIDs when found."""
-
     uid_read = pyqtSignal(str)
     status = pyqtSignal(str)
 
@@ -60,6 +61,9 @@ class MFRC522ReaderThread(QThread):
     def run(self):
         if not HAS_MFRC:
             self.status.emit("MFRC522 library not available; cannot start reader.")
+            return
+        if not SPI_AVAILABLE:
+            self.status.emit("SPI interface not available; check hardware and enable SPI in raspi-config.")
             return
 
         try:
@@ -75,7 +79,6 @@ class MFRC522ReaderThread(QThread):
             try:
                 (status, TagType) = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
                 if status == self.reader.MI_OK:
-                    # card detected
                     self.status.emit("Card detected")
                     (status2, uid) = self.reader.MFRC522_SelectTagSN()
                     if status2 == self.reader.MI_OK:
@@ -83,10 +86,8 @@ class MFRC522ReaderThread(QThread):
                         self.uid_read.emit(uid_str)
                     else:
                         self.status.emit("Authentication / UID read error")
-                # throttle polling
                 self.msleep(int(self._poll_interval * 1000))
             except Exception as e:
-                # emit and continue; don't crash the thread
                 self.status.emit(f"Reader loop error: {e}")
                 self.msleep(500)
 
@@ -98,12 +99,6 @@ class MFRC522ReaderThread(QThread):
 
 
 class MFRC522Plugin(QWidget):
-    """Plugin widget for MFRC522 RFID reader.
-
-    Constructor signature supports being called from the launcher:
-        MFRC522Plugin(parent=None, apps=apps_dict, cfg=cfg)
-    """
-
     name = "RFID Reader"
     description = "Read MFRC522 card UIDs (touchscreen-friendly)."
 
@@ -112,14 +107,11 @@ class MFRC522Plugin(QWidget):
         self.apps = apps or {}
         self.cfg = cfg or {}
 
-        # Enforce requested screen size
         self.setWindowTitle(self.name)
-        self.setFixedSize(900, 800)  # requested 900x800
+        self.setFixedSize(900, 800)
 
-        # Thread that reads the card
         self.reader_thread: Optional[MFRC522ReaderThread] = None
 
-        # UI
         layout = QVBoxLayout()
         layout.setSpacing(8)
         layout.setContentsMargins(12, 12, 12, 12)
@@ -133,13 +125,11 @@ class MFRC522Plugin(QWidget):
         info.setWordWrap(True)
         layout.addWidget(info)
 
-        # Console-style output
         self.output = QTextEdit()
         self.output.setReadOnly(True)
         self.output.setStyleSheet("font-family: monospace; font-size:14px;")
         layout.addWidget(self.output, stretch=1)
 
-        # Buttons
         btn_row = QHBoxLayout()
         self.start_btn = QPushButton("Start")
         self.start_btn.setFixedHeight(56)
@@ -159,7 +149,6 @@ class MFRC522Plugin(QWidget):
 
         layout.addLayout(btn_row)
 
-        # Back / Close
         back_row = QHBoxLayout()
         self.back_btn = QPushButton("Back")
         self.back_btn.setFixedHeight(56)
@@ -169,16 +158,15 @@ class MFRC522Plugin(QWidget):
 
         self.setLayout(layout)
 
-        # If the hardware library is missing, inform the user
         if not HAS_MFRC:
-            self.append_line("MFRC522 Python library not available on this system. Plugin will still load but cannot read cards.")
+            self.append_line("MFRC522 Python library not found. Install it to read cards.")
+        elif not SPI_AVAILABLE:
+            self.append_line("SPI interface not detected. Enable SPI to read cards.")
 
-    # ---------- helpers ----------
     def append_line(self, text: str):
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         self.output.append(f"[{ts}] {text}")
 
-    # ---------- reader control ----------
     def start_reader(self):
         if self.reader_thread and self.reader_thread.isRunning():
             return
@@ -205,14 +193,12 @@ class MFRC522Plugin(QWidget):
         self.append_line(f"Card read UID: {uid_str}")
 
     def on_start(self):
-        """Optional hook called by launcher when the plugin is shown."""
         try:
             self.start_btn.setFocus()
         except Exception:
             pass
 
     def on_close(self):
-        """Called by launcher when plugin closes — ensure reader is stopped."""
         try:
             if self.reader_thread and self.reader_thread.isRunning():
                 self.reader_thread.stop()
@@ -230,7 +216,6 @@ class MFRC522Plugin(QWidget):
             pass
 
 
-# If this file is executed directly, show a simple standalone window for testing.
 if __name__ == "__main__":
     import sys
     from PyQt6.QtWidgets import QApplication
