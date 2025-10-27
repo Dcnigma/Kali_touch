@@ -31,12 +31,18 @@
     "width": 940,
     "height": 800
   },
-  "Nmap Scan": {
-    "plugin": "plugins.nmap_plugin:NmapPlugin",
+  "RFID READ": {
+    "plugin": "plugins.mfrc522_plugin:MFRC522Plugin",
     "touch_icon": "icons/nmap.png",
     "x": 0,
     "y": 0    
   },
+  "RFID Read": {
+    "plugin": "plugins.nmap_plugin:NmapPlugin",
+    "touch_icon": "icons/nmap.png",
+    "x": 0,
+    "y": 0    
+  },  
     "Kismet": {
     "cmd": "/home/kali/Documents/kismet/kismet.sh",
     "touch_icon": "icons/nmap.png",
