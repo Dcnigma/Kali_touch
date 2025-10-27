@@ -347,7 +347,10 @@ class OverlayLauncher(QWidget):
     # ---------- Layout ----------
     def _position_close_btn(self):
         pad = 15
-        self.close_btn.move(self.width() - pad - self.close_btn.width(), pad)
+        geo = self.geometry()
+        x = geo.x() + geo.width() - pad - self.close_btn.width()
+        y = geo.y() + pad
+        self.close_btn.move(x, y)
 
     def resizeEvent(self, ev):
         self.overlay.setGeometry(0, 0, self.width(), self.height())
