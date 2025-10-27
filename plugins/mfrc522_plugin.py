@@ -4,8 +4,8 @@ import sys
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QApplication
 )
-from PyQt6.QtGui import QPixmap, QColor, QPalette
-from PyQt6.QtCore import Qt, QTimer, QMimeData
+from PyQt6.QtGui import QPixmap, QColor, QPalette, QBrush
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QClipboard
 
 # Ensure plugin folder is in sys.path
@@ -23,6 +23,7 @@ except ImportError:
 CARDS_PER_PAGE = 16  # 2 columns x 8 rows
 COLUMNS = 2
 ROWS = 8
+FLASH_DURATION_MS = 500
 
 class MFRC522Plugin(QWidget):
     def __init__(self, parent=None, apps=None, cfg=None):
@@ -30,7 +31,7 @@ class MFRC522Plugin(QWidget):
         self.cfg = cfg
         self.setWindowTitle("RFID Reader")
         self.setFixedSize(800, 900)
-        self.cards = []  # List of scanned card UIDs
+        self.cards = []
         self.page = 0
         self.checkboxes = []
         self.continue_reading = True
@@ -40,7 +41,7 @@ class MFRC522Plugin(QWidget):
         if LIB_AVAILABLE:
             self.reader = MFRC522.MFRC522()
         else:
-            self.log_message("MFRC522 Python library not available on this system.\nPlace MFRC522.py in the same folder as this plugin to read cards.")
+            self.log_message("MFRC522 Python library not available on this system.\nPlace MFRC522.py in the same folder as this plugin.")
 
         # Timer to poll cards
         self.timer = QTimer()
@@ -48,7 +49,18 @@ class MFRC522Plugin(QWidget):
         self.timer.start(500)
 
     def init_ui(self):
+        # Set background image
+        bg_path = os.path.join(plugin_folder, "background.png")
+        if os.path.exists(bg_path):
+            self.setAutoFillBackground(True)
+            palette = self.palette()
+            pixmap = QPixmap(bg_path).scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
+            palette.setBrush(QPalette.ColorRole.Window, QBrush(pixmap))
+            self.setPalette(palette)
+
         main_layout = QVBoxLayout()
+        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(20, 20, 20, 20)
         self.setLayout(main_layout)
 
         # Logo
@@ -59,10 +71,13 @@ class MFRC522Plugin(QWidget):
             self.logo_label.setPixmap(pixmap)
             self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.logo_label)
+        main_layout.addStretch(1)  # push the grid higher
 
-        # Checkbox grid
+        # Checkbox grid with semi-transparent background
         self.grid_widget = QWidget()
+        self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,80); border-radius: 10px;")
         self.grid_layout = QGridLayout()
+        self.grid_layout.setSpacing(10)
         self.grid_widget.setLayout(self.grid_layout)
         main_layout.addWidget(self.grid_widget)
 
@@ -80,18 +95,28 @@ class MFRC522Plugin(QWidget):
         self.prev_button.clicked.connect(self.prev_page)
         self.next_button = QPushButton("Next")
         self.next_button.clicked.connect(self.next_page)
+        pagination_layout.addStretch(1)
         pagination_layout.addWidget(self.prev_button)
         pagination_layout.addWidget(self.next_button)
+        pagination_layout.addStretch(1)
         main_layout.addLayout(pagination_layout)
+
+        # Clipboard feedback
+        self.feedback_label = QLabel("")
+        self.feedback_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.feedback_label.setStyleSheet("color: yellow; font-weight: bold;")
+        main_layout.addWidget(self.feedback_label)
 
     def checkbox_clicked(self):
         cb = self.sender()
         if cb.text():
             clipboard = QApplication.clipboard()
             clipboard.setText(cb.text())
+            self.feedback_label.setText(f"Copied UID: {cb.text()}")
+            QTimer.singleShot(1000, lambda: self.feedback_label.setText(""))  # clear after 1s
 
     def log_message(self, text):
-        print(text)  # optional console log
+        print(text)
 
     def uid_to_string(self, uid):
         return ''.join(format(i, '02X') for i in uid)
@@ -120,12 +145,13 @@ class MFRC522Plugin(QWidget):
         for i, cb in enumerate(self.checkboxes):
             if i < len(page_cards):
                 cb.setText(page_cards[i])
-                if page_cards[i] == highlight_uid:
-                    cb.setStyleSheet("color: green; font-weight: bold; font-size: 16px;")
-                else:
-                    cb.setStyleSheet("color: lightgrey; font-size: 16px;")
                 cb.setChecked(False)
                 cb.setEnabled(True)
+                if page_cards[i] == highlight_uid:
+                    cb.setStyleSheet("color: green; font-weight: bold; font-size: 16px;")
+                    QTimer.singleShot(FLASH_DURATION_MS, lambda cb=cb: cb.setStyleSheet("color: lightgrey; font-size: 16px;"))
+                else:
+                    cb.setStyleSheet("color: lightgrey; font-size: 16px;")
             else:
                 cb.setText("")
                 cb.setChecked(False)
