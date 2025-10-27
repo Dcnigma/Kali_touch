@@ -11,14 +11,12 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt
 
 # --- Add local plugins folder to sys.path ---
-sys.path.append(os.path.dirname(__file__))
-
+sys.path.insert(0, os.path.dirname(__file__))  # make sure Python sees MFRC522.py
 try:
-    import MFRC522
+import MFRC522
     MFRC522_AVAILABLE = True
 except ImportError:
     MFRC522_AVAILABLE = False
-
 
 class MFRC522Plugin(QWidget):
     name = "MFRC522 Reader"
