@@ -37,7 +37,7 @@
     "x": 0,
     "y": 0    
   },
-  "RFID Read": {
+  "Nmap Plugin": {
     "plugin": "plugins.nmap_plugin:NmapPlugin",
     "touch_icon": "icons/nmap.png",
     "x": 0,
