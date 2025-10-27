@@ -276,7 +276,7 @@ class OverlayLauncher(QWidget):
         ui_layout.setContentsMargins(36, 20, 36, 18)
 
         # --- Add top spacer to push apps lower (≈50px) ---
-        ui_layout.addSpacerItem(QSpacerItem(0, 80, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed))
+        ui_layout.addSpacerItem(QSpacerItem(0, 60, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed))
 
         # App grid
         self.grid = QGridLayout()
