@@ -397,7 +397,7 @@ class OverlayLauncher(QWidget):
                     btn.setIconSize(QSize(64, 64))
             else:
                 # Showcase 3 mode
-                btn.setFixedSize(700, 220)
+                btn.setFixedSize(500, 220)
                 btn.setStyleSheet("""
                     QPushButton {
                         text-align: left;
