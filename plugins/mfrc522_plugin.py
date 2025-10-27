@@ -6,6 +6,13 @@ import time
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QLabel
 from PyQt6.QtCore import QTimer, Qt
 
+print("=== DEBUG INFO ===")
+print("Current working directory:", os.getcwd())
+print("Plugin file path:", os.path.abspath(__file__))
+print("sys.path:", sys.path)
+print("Contents of plugin folder:", os.listdir(os.path.dirname(os.path.abspath(__file__))))
+print("==================")
+
 # Ensure MFRC522.py in the same folder can be imported
 plugin_dir = os.path.dirname(os.path.abspath(__file__))
 if plugin_dir not in sys.path:
