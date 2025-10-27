@@ -55,10 +55,10 @@ def load_plugin(app_name, app_data, parent=None):
         cls = getattr(module, class_name.strip())
 
         try:
-            plugin_widget = cls(parent=parent, apps=apps_dict, cfg=app_data)
+            plugin_widget = cls(None, apps=apps_dict, cfg=app_data)
         except TypeError:
             try:
-                plugin_widget = cls(parent=parent)
+                plugin_widget = cls(None)
                 setattr(plugin_widget, "cfg", app_data)
             except TypeError:
                 plugin_widget = cls()
@@ -451,6 +451,7 @@ class OverlayLauncher(QWidget):
         y = (self.SCREEN_H - h) // 2
         widget.setGeometry(x, y, w, h)
         widget.show()
+        self.close_btn.raise_()
         widget.raise_()
         self.close_btn.fade_in()
         self.raise_timer.start(100)
