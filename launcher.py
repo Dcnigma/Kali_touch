@@ -80,8 +80,8 @@ def load_plugin(app_name, app_data, parent=None):
 
 # ---------- Floating Close Button with Fade ----------
 class FloatingCloseButton(QPushButton):
-    def __init__(self, callback, parent=None):
-        super().__init__("✕")  # removed parent binding
+    def __init__(self, callback):
+        super().__init__("✕")  # no parent binding
         size = 75
         self.setFixedSize(size, size)
         self.setStyleSheet(f"""
@@ -95,7 +95,7 @@ class FloatingCloseButton(QPushButton):
             QPushButton:hover {{ background-color: rgba(200,0,0,220); }}
         """)
         self.clicked.connect(callback)
-        # Make it a *top-level* tool window — not a child
+        # Make it a floating, top-level window — not tied to the main window
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
@@ -103,8 +103,7 @@ class FloatingCloseButton(QPushButton):
             Qt.WindowType.NoDropShadowWindowHint
         )
 
-
-        # Fade effect
+        # Fade animation support
         self.fade_effect = QGraphicsOpacityEffect(self)
         self.setGraphicsEffect(self.fade_effect)
         self.anim = QPropertyAnimation(self.fade_effect, b"opacity")
@@ -126,7 +125,6 @@ class FloatingCloseButton(QPushButton):
         self.anim.setEndValue(0.0)
         self.anim.finished.connect(hide_after)
         self.anim.start()
-
 
 # ---------- Settings Dialog ----------
 class SettingsDialog(QDialog):
@@ -308,9 +306,10 @@ class OverlayLauncher(QWidget):
         bottom_bar.addLayout(right_container)
         ui_layout.addLayout(bottom_bar)
 
-        # Floating close button (fade)
-        self.close_btn = FloatingCloseButton(self.close_current, parent=self)
+        # Create floating Close button (not tied to launcher window)
+        self.close_btn = FloatingCloseButton(self.close_current)
         self.close_btn.hide()
+        self._position_close_btn()
 
         self.raise_timer = QTimer(self)
         self.raise_timer.timeout.connect(self._raise_close_btn)
@@ -346,8 +345,9 @@ class OverlayLauncher(QWidget):
 
     # ---------- Layout ----------
     def _position_close_btn(self):
+        """Position floating Close button relative to screen, not window frame."""
         pad = 15
-        geo = self.geometry()
+        geo = self.geometry()  # absolute screen coordinates
         x = geo.x() + geo.width() - pad - self.close_btn.width()
         y = geo.y() + pad
         self.close_btn.move(x, y)
@@ -458,6 +458,7 @@ class OverlayLauncher(QWidget):
         widget.setGeometry(x, y, w, h)
         widget.show()
         widget.raise_()
+        self._position_close_btn()
         self.close_btn.fade_in()
         self.raise_timer.start(100)
         self.current_plugin = widget
