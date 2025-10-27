@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 import os
 import sys
-import signal
 import time
 from PyQt6 import QtWidgets, QtCore
 
 # ---------- Ensure MFRC522.py is importable ----------
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
-mfrc522_path = os.path.join(plugin_folder, "MFRC522.py")
-if os.path.exists(mfrc522_path) and plugin_folder not in sys.path:
+if plugin_folder not in sys.path:
     sys.path.insert(0, plugin_folder)
 
 try:
@@ -32,7 +30,6 @@ class MFRC522Plugin(QtWidgets.QWidget):
         self.resize(800, 900)
 
         self.cfg = cfg
-        self.continue_reading = True
 
         # UI: label
         self.label = QtWidgets.QLabel("No card detected", self)
@@ -76,9 +73,6 @@ class RFIDWorker(QtCore.QObject):
         self.continue_reading = True
 
     def run(self):
-        # Capture SIGINT when running standalone
-        signal.signal(signal.SIGINT, self.end_read)
-
         while self.continue_reading:
             (status, _) = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
             if status == self.reader.MI_OK:
@@ -88,9 +82,6 @@ class RFIDWorker(QtCore.QObject):
             time.sleep(0.5)
 
     def stop(self):
-        self.continue_reading = False
-
-    def end_read(self, signal_num, frame):
         self.continue_reading = False
 
 # ---------- Standalone Launch ----------
