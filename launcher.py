@@ -503,8 +503,7 @@ def wait_for_window(self):
     except Exception as e:
         log(f"[LAUNCH] wait_for_window error: {e}")
         self._finish_launch()
-
-wait_for_window()
+        wait_for_window()
 
     def _finish_launch(self):
         self.move(0, 0)
