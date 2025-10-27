@@ -538,6 +538,13 @@ class OverlayLauncher(QWidget):
         self.move(0, 0)
         self._position_close_btn()
         self.close_btn.fade_out()
+# optionally delete so it's fresh next time (uncomment if desired)
+        # try:
+        #     if self.close_btn:
+        #         self.close_btn.deleteLater()
+        #         self.close_btn = None
+        # except Exception:
+        #     pass
 
     def _raise_close_btn(self):
         if self.close_btn.isVisible():
