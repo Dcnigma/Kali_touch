@@ -149,7 +149,7 @@ class SettingsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Launcher Settings")
         self.settings_path = settings_path
-        self.resize(480, 220)
+        self.resize(480, 260)
 
         layout = QFormLayout(self)
 
@@ -160,6 +160,11 @@ class SettingsDialog(QDialog):
         self.sort_cb = QComboBox()
         self.sort_cb.addItems(["By name", "By category", "Manual"])
         layout.addRow("Sort:", self.sort_cb)
+
+        # ✅ NEW: view mode selector
+        self.view_cb = QComboBox()
+        self.view_cb.addItems(["Grid 9x9", "Showcase 3"])
+        layout.addRow("App layout:", self.view_cb)
 
         btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         btns.accepted.connect(self.accept)
@@ -175,11 +180,16 @@ class SettingsDialog(QDialog):
                     s = json.load(f)
                 self.theme_cb.setCurrentText(s.get("theme", "Dark"))
                 self.sort_cb.setCurrentText(s.get("sort", "By name"))
+                self.view_cb.setCurrentText(s.get("view", "Grid 9x9"))
             except Exception:
                 pass
 
     def save_settings(self):
-        s = {"theme": self.theme_cb.currentText(), "sort": self.sort_cb.currentText()}
+        s = {
+            "theme": self.theme_cb.currentText(),
+            "sort": self.sort_cb.currentText(),
+            "view": self.view_cb.currentText()
+        }
         try:
             with open(self.settings_path, "w") as f:
                 json.dump(s, f, indent=2)
@@ -189,7 +199,6 @@ class SettingsDialog(QDialog):
     def accept(self) -> None:
         self.save_settings()
         super().accept()
-
 
 # ---------- Startup Splash Screen ----------
 class SplashScreen(QWidget):
@@ -339,26 +348,73 @@ class OverlayLauncher(QWidget):
             try:
                 with open(self.theme_file, "r") as f:
                     data = json.load(f)
+                    self.view_mode = data.get("view", "Grid 9x9")
                     return data.get("theme", "Dark")
             except Exception:
                 pass
+        self.view_mode = "Grid 9x9"
         return "Dark"
 
-    def apply_theme(self, theme):
-        palette = QPalette()
-        if theme == "Light":
-            palette.setColor(QPalette.ColorRole.Window, QColor("#f0f0f0"))
-            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.black)
-        else:
-            palette.setColor(QPalette.ColorRole.Window, QColor("#1e1e1e"))
-            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
-        QApplication.instance().setPalette(palette)
+    def show_page(self):
+        # Clear grid
+        for i in reversed(range(self.grid.count())):
+            w = self.grid.itemAt(i).widget()
+            if w:
+                w.setParent(None)
 
-    def toggle_theme(self):
-        self.theme = "Light" if self.theme == "Dark" else "Dark"
-        self.apply_theme(self.theme)
-        with open(self.theme_file, "w") as f:
-            json.dump({"theme": self.theme}, f, indent=2)
+        # Choose layout type
+        grid_mode = (self.view_mode == "Grid 9x9")
+        self.apps_per_page = 9 if grid_mode else 3
+
+        start = self.page * self.apps_per_page
+        end = start + self.apps_per_page
+        page_items = self.apps[start:end]
+
+        for idx, cfg in enumerate(page_items):
+            row, col = (divmod(idx, 3) if grid_mode else (idx, 0))
+            name = cfg.get("name", "App")
+
+            btn = QPushButton()
+            if grid_mode:
+                btn.setFixedSize(220, 116)
+                btn.setStyleSheet("font-size:20px; background-color:#2f2f2f; color:white; border-radius:10px;")
+                btn.setText(name)
+                icon_path = cfg.get("touch_icon")
+                if icon_path and os.path.exists(icon_path):
+                    pix = QPixmap(icon_path).scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio)
+                    btn.setIcon(QIcon(pix))
+                    btn.setIconSize(QSize(64, 64))
+            else:
+                # Showcase 3 mode
+                btn.setFixedSize(700, 220)
+                btn.setStyleSheet("""
+                    QPushButton {
+                        text-align: left;
+                        font-size: 28px;
+                        padding: 12px;
+                        background-color: #3a3a3a;
+                        color: white;
+                        border-radius: 14px;
+                    }
+                    QPushButton:hover { background-color: #4a4a4a; }
+                """)
+                icon_path = cfg.get("touch_icon")
+                if icon_path and os.path.exists(icon_path):
+                    pix = QPixmap(icon_path).scaled(160, 220, Qt.AspectRatioMode.KeepAspectRatioByExpanding)
+                    btn.setIcon(QIcon(pix))
+                    btn.setIconSize(QSize(160, 220))
+                btn.setText(f"    {name}")
+
+            if "cmd" in cfg:
+                btn.clicked.connect(lambda _, c=cfg: self.launch_app(c))
+            elif "plugin" in cfg:
+                btn.clicked.connect(lambda _, c=cfg: self._start_plugin_safe(c))
+
+            self.grid.addWidget(btn, row, col, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        total_pages = max(1, (len(self.apps) - 1) // self.apps_per_page + 1)
+        self.page_label.setText(f"Page {self.page + 1} / {total_pages}")
+
 
     # ---------- Layout ----------
     def _position_close_btn(self):
