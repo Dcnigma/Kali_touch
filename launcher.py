@@ -78,7 +78,7 @@ def load_plugin(app_name, app_data, parent=None):
         return None
 
 
-# ---------- Floating Close Button with Fade ----------
+# ---------- Floating Close Button ----------
 class FloatingCloseButton(QPushButton):
     def __init__(self, callback):
         super().__init__("✕")
@@ -161,7 +161,6 @@ class SettingsDialog(QDialog):
         self.sort_cb.addItems(["By name", "By category", "Manual"])
         layout.addRow("Sort:", self.sort_cb)
 
-        # ✅ NEW: view mode selector
         self.view_cb = QComboBox()
         self.view_cb.addItems(["Grid 9x9", "Showcase 3"])
         layout.addRow("App layout:", self.view_cb)
@@ -200,7 +199,8 @@ class SettingsDialog(QDialog):
         self.save_settings()
         super().accept()
 
-# ---------- Startup Splash Screen ----------
+
+# ---------- Splash Screen ----------
 class SplashScreen(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -257,7 +257,6 @@ class OverlayLauncher(QWidget):
         self.current_process = None
         self.current_plugin = None
 
-        # Load theme
         self.theme_file = "launcher_settings.json"
         self.theme = self.load_theme()
         self.apply_theme(self.theme)
@@ -268,24 +267,22 @@ class OverlayLauncher(QWidget):
         self.overlay.setStyleSheet("background-color: rgba(0,0,0,200);")
         self.overlay.hide()
 
-        # UI container
+        # Main UI container
         self.ui_container = QWidget(self)
         self.ui_container.setGeometry(0, 0, self.SCREEN_W, self.SCREEN_H)
         ui_layout = QVBoxLayout(self.ui_container)
         ui_layout.setSpacing(10)
         ui_layout.setContentsMargins(36, 20, 36, 18)
 
-        # App grid
         self.grid = QGridLayout()
         self.grid.setSpacing(12)
         ui_layout.addLayout(self.grid)
         ui_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
-        # ---------- Bottom bar ----------
+        # Bottom bar
         bottom_bar = QHBoxLayout()
         bottom_bar.setContentsMargins(8, 0, 8, 8)
 
-        # Stop Launcher button
         self.stop_btn = QPushButton("Stop Launcher")
         self.stop_btn.setFixedSize(180, 64)
         self.stop_btn.setStyleSheet("font-size:18px; background-color:#5a5a5a; color:white; border-radius:8px;")
@@ -294,16 +291,13 @@ class OverlayLauncher(QWidget):
 
         bottom_bar.addStretch(1)
 
-        # Center label
         self.page_label = QLabel()
         self.page_label.setStyleSheet("font-size:18px; color:white;")
         bottom_bar.addWidget(self.page_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         bottom_bar.addStretch(1)
 
-        # Right side: Theme + Settings + navigation
         right_container = QHBoxLayout()
-
         self.theme_btn = QPushButton("Theme")
         self.theme_btn.setFixedSize(120, 64)
         self.theme_btn.setStyleSheet("font-size:16px; background-color:#2a82da; color:white; border-radius:8px;")
@@ -332,7 +326,7 @@ class OverlayLauncher(QWidget):
         bottom_bar.addLayout(right_container)
         ui_layout.addLayout(bottom_bar)
 
-        # Floating close button (fade)
+        # Floating close button
         self.close_btn = FloatingCloseButton(self.close_current)
         self.close_btn.hide()
         self._position_close_btn()
@@ -355,6 +349,23 @@ class OverlayLauncher(QWidget):
         self.view_mode = "Grid 9x9"
         return "Dark"
 
+    def apply_theme(self, theme):
+        palette = QPalette()
+        if theme == "Light":
+            palette.setColor(QPalette.ColorRole.Window, QColor("#f0f0f0"))
+            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.black)
+        else:
+            palette.setColor(QPalette.ColorRole.Window, QColor("#1e1e1e"))
+            palette.setColor(QPalette.ColorRole.WindowText, Qt.GlobalColor.white)
+        QApplication.instance().setPalette(palette)
+
+    def toggle_theme(self):
+        self.theme = "Light" if self.theme == "Dark" else "Dark"
+        self.apply_theme(self.theme)
+        with open(self.theme_file, "w") as f:
+            json.dump({"theme": self.theme, "view": self.view_mode}, f, indent=2)
+
+    # ---------- Page Handling ----------
     def show_page(self):
         # Clear grid
         for i in reversed(range(self.grid.count())):
@@ -362,7 +373,6 @@ class OverlayLauncher(QWidget):
             if w:
                 w.setParent(None)
 
-        # Choose layout type
         grid_mode = (self.view_mode == "Grid 9x9")
         self.apps_per_page = 9 if grid_mode else 3
 
@@ -415,40 +425,6 @@ class OverlayLauncher(QWidget):
         total_pages = max(1, (len(self.apps) - 1) // self.apps_per_page + 1)
         self.page_label.setText(f"Page {self.page + 1} / {total_pages}")
 
-
-    # ---------- Layout ----------
-    def _position_close_btn(self):
-        pad = 15
-        geo = self.geometry()
-        x = geo.x() + geo.width() - pad - self.close_btn.width()
-        y = geo.y() + pad
-        try:
-            self.close_btn.move(x, y)
-        except Exception:
-            pass
-
-    def ensure_close_btn(self):
-        if not getattr(self, "close_btn", None) or not isinstance(self.close_btn, QWidget):
-            try:
-                self.close_btn = FloatingCloseButton(self.close_current)
-            except Exception:
-                self.close_btn = None
-                return
-        self._position_close_btn()
-        try:
-            self.close_btn.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
-            self.close_btn.raise_()
-        except Exception:
-            pass
-
-    def resizeEvent(self, ev):
-        self.overlay.setGeometry(0, 0, self.width(), self.height())
-        self.ui_container.setGeometry(0, 0, self.width(), self.height())
-        self._position_close_btn()
-        super().resizeEvent(ev)
-
-    # ---------- Page Handling ----------
-
     def next_page(self):
         total = max(1, (len(self.apps) - 1) // self.apps_per_page + 1)
         self.page = (self.page + 1) % total
@@ -464,7 +440,11 @@ class OverlayLauncher(QWidget):
         dlg = SettingsDialog(self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             self.theme = dlg.theme_cb.currentText()
+            self.view_mode = dlg.view_cb.currentText()
             self.apply_theme(self.theme)
+            with open(self.theme_file, "w") as f:
+                json.dump({"theme": self.theme, "view": self.view_mode}, f, indent=2)
+            self.show_page()
 
     # ---------- App launching ----------
     def launch_app(self, cfg):
@@ -513,9 +493,6 @@ class OverlayLauncher(QWidget):
             self._finish_launch()
 
     def _finish_launch(self):
-        self.move(0, 0)
-        self.ui_container.move(0, 0)
-        self.overlay.move(0, 0)
         self.overlay.hide()
         self.ensure_close_btn()
         self._position_close_btn()
@@ -565,9 +542,25 @@ class OverlayLauncher(QWidget):
 
         self.overlay.hide()
         self.ui_container.show()
-        self.move(0, 0)
         self._position_close_btn()
         self.close_btn.fade_out()
+
+    def _position_close_btn(self):
+        pad = 15
+        geo = self.geometry()
+        x = geo.x() + geo.width() - pad - self.close_btn.width()
+        y = geo.y() + pad
+        try:
+            self.close_btn.move(x, y)
+        except Exception:
+            pass
+
+    def ensure_close_btn(self):
+        if not getattr(self, "close_btn", None) or not isinstance(self.close_btn, QWidget):
+            self.close_btn = FloatingCloseButton(self.close_current)
+        self._position_close_btn()
+        self.close_btn.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.close_btn.raise_()
 
     def _raise_close_btn(self):
         if self.close_btn and self.close_btn.isVisible():
@@ -583,8 +576,6 @@ class OverlayLauncher(QWidget):
 # ---------- Main entry ----------
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-
-    # Show splash screen
     splash = SplashScreen()
     splash.show_splash()
 
@@ -592,4 +583,3 @@ if __name__ == "__main__":
     QTimer.singleShot(1800, launcher.show)
 
     sys.exit(app.exec())
-
