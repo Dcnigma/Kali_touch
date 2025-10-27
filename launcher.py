@@ -367,64 +367,70 @@ class OverlayLauncher(QWidget):
             json.dump({"theme": self.theme, "view": self.view_mode}, f, indent=2)
 
     # ---------- Page Handling ----------
-    def show_page(self):
-        # Clear grid
-        for i in reversed(range(self.grid.count())):
-            w = self.grid.itemAt(i).widget()
-            if w:
-                w.setParent(None)
+def show_page(self):
+    # Clear grid
+    for i in reversed(range(self.grid.count())):
+        w = self.grid.itemAt(i).widget()
+        if w:
+            w.setParent(None)
 
-        grid_mode = (self.view_mode == "Grid 9x9")
-        self.apps_per_page = 9 if grid_mode else 3
+    # Determine layout type
+    grid_mode = (self.view_mode == "Grid 9x9")
+    self.apps_per_page = 9 if grid_mode else 3
 
-        start = self.page * self.apps_per_page
-        end = start + self.apps_per_page
-        page_items = self.apps[start:end]
+    start = self.page * self.apps_per_page
+    end = start + self.apps_per_page
+    page_items = self.apps[start:end]
 
-        for idx, cfg in enumerate(page_items):
-            row, col = (divmod(idx, 3) if grid_mode else (idx, 0))
-            name = cfg.get("name", "App")
+    for idx, cfg in enumerate(page_items):
+        if grid_mode:
+            row, col = divmod(idx, 3)
+        else:
+            row, col = (0, idx)  # ← side by side (1 row, 3 columns)
 
-            btn = QPushButton()
-            if grid_mode:
-                btn.setFixedSize(220, 116)
-                btn.setStyleSheet("font-size:20px; background-color:#2f2f2f; color:white; border-radius:10px;")
-                btn.setText(name)
-                icon_path = cfg.get("touch_icon")
-                if icon_path and os.path.exists(icon_path):
-                    pix = QPixmap(icon_path).scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio)
-                    btn.setIcon(QIcon(pix))
-                    btn.setIconSize(QSize(64, 64))
-            else:
-                # Showcase 3 mode
-                btn.setFixedSize(200, 70)
-                btn.setStyleSheet("""
-                    QPushButton {
-                        text-align: left;
-                        font-size: 28px;
-                        padding: 12px;
-                        background-color: #3a3a3a;
-                        color: white;
-                        border-radius: 14px;
-                    }
-                    QPushButton:hover { background-color: #4a4a4a; }
-                """)
-                icon_path = cfg.get("touch_icon")
-                if icon_path and os.path.exists(icon_path):
-                    pix = QPixmap(icon_path).scaled(160, 220, Qt.AspectRatioMode.KeepAspectRatioByExpanding)
-                    btn.setIcon(QIcon(pix))
-                    btn.setIconSize(QSize(160, 220))
-                btn.setText(f"    {name}")
+        name = cfg.get("name", "App")
+        btn = QPushButton()
 
-            if "cmd" in cfg:
-                btn.clicked.connect(lambda _, c=cfg: self.launch_app(c))
-            elif "plugin" in cfg:
-                btn.clicked.connect(lambda _, c=cfg: self._start_plugin_safe(c))
+        if grid_mode:
+            btn.setFixedSize(220, 116)
+            btn.setStyleSheet("font-size:20px; background-color:#2f2f2f; color:white; border-radius:10px;")
+            btn.setText(name)
+            icon_path = cfg.get("touch_icon")
+            if icon_path and os.path.exists(icon_path):
+                pix = QPixmap(icon_path).scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio)
+                btn.setIcon(QIcon(pix))
+                btn.setIconSize(QSize(64, 64))
+        else:
+            # Showcase 3 mode (horizontal layout)
+            btn.setFixedSize(400, 220)
+            btn.setStyleSheet("""
+                QPushButton {
+                    text-align: left;
+                    font-size: 24px;
+                    padding: 12px;
+                    background-color: #3a3a3a;
+                    color: white;
+                    border-radius: 14px;
+                }
+                QPushButton:hover { background-color: #4a4a4a; }
+            """)
+            icon_path = cfg.get("touch_icon")
+            if icon_path and os.path.exists(icon_path):
+                pix = QPixmap(icon_path).scaled(160, 220, Qt.AspectRatioMode.KeepAspectRatioByExpanding)
+                btn.setIcon(QIcon(pix))
+                btn.setIconSize(QSize(160, 220))
+            btn.setText(f"    {name}")
 
-            self.grid.addWidget(btn, row, col, alignment=Qt.AlignmentFlag.AlignCenter)
+        if "cmd" in cfg:
+            btn.clicked.connect(lambda _, c=cfg: self.launch_app(c))
+        elif "plugin" in cfg:
+            btn.clicked.connect(lambda _, c=cfg: self._start_plugin_safe(c))
 
-        total_pages = max(1, (len(self.apps) - 1) // self.apps_per_page + 1)
-        self.page_label.setText(f"Page {self.page + 1} / {total_pages}")
+        self.grid.addWidget(btn, row, col, alignment=Qt.AlignmentFlag.AlignCenter)
+
+    total_pages = max(1, (len(self.apps) - 1) // self.apps_per_page + 1)
+    self.page_label.setText(f"Page {self.page + 1} / {total_pages}")
+
 
     def next_page(self):
         total = max(1, (len(self.apps) - 1) // self.apps_per_page + 1)
