@@ -47,7 +47,7 @@ def load_plugin(app_name, app_data, parent=None):
     try:
         plugin_path = app_data.get("plugin")
         if not plugin_path:
-            log(f"[PLUGIN] ⚠ No plugin path for '{app_name}'")
+            log(f"[PLUGIN] âš  No plugin path for '{app_name}'")
             return None
 
         module_name, class_name = plugin_path.split(":")
@@ -73,7 +73,7 @@ def load_plugin(app_name, app_data, parent=None):
 
         return plugin_widget
     except Exception as e:
-        print(f"[PLUGIN] ❌ Failed to load '{app_name}': {e}")
+        print(f"[PLUGIN] âŒ Failed to load '{app_name}': {e}")
         traceback.print_exc()
         return None
 
@@ -81,7 +81,7 @@ def load_plugin(app_name, app_data, parent=None):
 # ---------- Floating Close Button with Fade ----------
 class FloatingCloseButton(QPushButton):
     def __init__(self, callback, parent=None):
-        super().__init__("✕", parent=parent)
+        super().__init__("âœ•", parent=parent)
         size = 75
         self.setFixedSize(size, size)
         self.setStyleSheet(f"""
@@ -290,12 +290,12 @@ class OverlayLauncher(QWidget):
         right_container.addWidget(self.settings_btn)
 
         nav_style = "font-size:18px; background-color:#444; color:white; border-radius:8px; padding:8px 16px;"
-        self.prev_btn = QPushButton("← Prev")
+        self.prev_btn = QPushButton("â† Prev")
         self.prev_btn.setFixedSize(120, 64)
         self.prev_btn.setStyleSheet(nav_style)
         self.prev_btn.clicked.connect(self.prev_page)
 
-        self.next_btn = QPushButton("Next →")
+        self.next_btn = QPushButton("Next â†’")
         self.next_btn.setFixedSize(120, 64)
         self.next_btn.setStyleSheet(nav_style)
         self.next_btn.clicked.connect(self.next_page)
