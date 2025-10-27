@@ -385,47 +385,85 @@ class OverlayLauncher(QWidget):
             if grid_mode:
                 row, col = divmod(idx, 3)
             else:
-                row, col = (0, idx)  # ← side by side (1 row, 3 columns)
+                row, col = (0, idx)  # ← 1 row, 3 tiles side by side
 
             name = cfg.get("name", "App")
-            btn = QPushButton()
+            icon_path = cfg.get("touch_icon")
 
             if grid_mode:
+                # Normal grid layout
+                btn = QPushButton()
                 btn.setFixedSize(220, 116)
-                btn.setStyleSheet("font-size:20px; background-color:#2f2f2f; color:white; border-radius:10px;")
+                btn.setStyleSheet("""
+                    QPushButton {
+                        font-size: 20px;
+                        background-color: #2f2f2f;
+                        color: white;
+                        border-radius: 10px;
+                    }
+                    QPushButton:hover { background-color: #3a3a3a; }
+                """)
                 btn.setText(name)
-                icon_path = cfg.get("touch_icon")
                 if icon_path and os.path.exists(icon_path):
                     pix = QPixmap(icon_path).scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio)
                     btn.setIcon(QIcon(pix))
                     btn.setIconSize(QSize(64, 64))
+
             else:
-                # Showcase 3 mode (horizontal layout)
-                btn.setFixedSize(400, 220)
+                # Showcase 3 layout: big tile, icon on top, text below
+                tile = QWidget()
+                vbox = QVBoxLayout(tile)
+                vbox.setSpacing(12)
+                vbox.setContentsMargins(8, 8, 8, 8)
+                tile.setFixedSize(360, 360)
+                tile.setStyleSheet("""
+                    QWidget {
+                        background-color: #3a3a3a;
+                        border-radius: 16px;
+                    }
+                    QWidget:hover {
+                        background-color: #4a4a4a;
+                    }
+                """)
+
+                icon_label = QLabel()
+                icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                if icon_path and os.path.exists(icon_path):
+                    pix = QPixmap(icon_path).scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                    icon_label.setPixmap(pix)
+                else:
+                    icon_label.setText("📦")
+                    icon_label.setStyleSheet("font-size: 72px; color: white;")
+
+                text_label = QLabel(name)
+                text_label.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+                text_label.setStyleSheet("font-size: 24px; color: white; font-weight: 500;")
+
+                vbox.addWidget(icon_label, alignment=Qt.AlignmentFlag.AlignCenter)
+                vbox.addWidget(text_label, alignment=Qt.AlignmentFlag.AlignTop)
+
+                # Clickable overlay button
+                btn = QPushButton(tile)
+                btn.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn.setStyleSheet("""
                     QPushButton {
-                        text-align: left;
-                        font-size: 24px;
-                        padding: 12px;
-                        background-color: #3a3a3a;
-                        color: white;
-                        border-radius: 14px;
+                        background-color: rgba(0,0,0,0);
+                        border: none;
                     }
-                    QPushButton:hover { background-color: #4a4a4a; }
+                    QPushButton:hover {
+                        background-color: rgba(255,255,255,40);
+                        border-radius: 16px;
+                    }
                 """)
-                icon_path = cfg.get("touch_icon")
-                if icon_path and os.path.exists(icon_path):
-                    pix = QPixmap(icon_path).scaled(160, 220, Qt.AspectRatioMode.KeepAspectRatioByExpanding)
-                    btn.setIcon(QIcon(pix))
-                    btn.setIconSize(QSize(160, 220))
-                btn.setText(f"    {name}")
+                btn.setGeometry(0, 0, 360, 360)
 
             if "cmd" in cfg:
                 btn.clicked.connect(lambda _, c=cfg: self.launch_app(c))
             elif "plugin" in cfg:
                 btn.clicked.connect(lambda _, c=cfg: self._start_plugin_safe(c))
 
-            self.grid.addWidget(btn, row, col, alignment=Qt.AlignmentFlag.AlignCenter)
+            # Add the correct widget to the grid
+            self.grid.addWidget(tile if not grid_mode else btn, row, col, alignment=Qt.AlignmentFlag.AlignCenter)
 
         total_pages = max(1, (len(self.apps) - 1) // self.apps_per_page + 1)
         self.page_label.setText(f"Page {self.page + 1} / {total_pages}")
