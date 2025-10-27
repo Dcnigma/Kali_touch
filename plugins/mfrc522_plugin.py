@@ -4,7 +4,7 @@ import sys
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QApplication
 )
-from PyQt6.QtGui import QPixmap, QColor, QPalette, QBrush
+from PyQt6.QtGui import QPixmap, QColor
 from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QClipboard
 
@@ -41,7 +41,7 @@ class MFRC522Plugin(QWidget):
         if LIB_AVAILABLE:
             self.reader = MFRC522.MFRC522()
         else:
-            self.log_message("MFRC522 Python library not available on this system.\nPlace MFRC522.py in the same folder as this plugin.")
+            self.log_message("MFRC522 Python library not available on this system.\nPlace MFRC522.py in the same folder as this plugin to read cards.")
 
         # Timer to poll cards
         self.timer = QTimer()
@@ -49,18 +49,8 @@ class MFRC522Plugin(QWidget):
         self.timer.start(500)
 
     def init_ui(self):
-        # Set background image
-        bg_path = os.path.join(plugin_folder, "background.png")
-        if os.path.exists(bg_path):
-            self.setAutoFillBackground(True)
-            palette = self.palette()
-            pixmap = QPixmap(bg_path).scaled(self.size(), Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
-            palette.setBrush(QPalette.ColorRole.Window, QBrush(pixmap))
-            self.setPalette(palette)
-
         main_layout = QVBoxLayout()
         main_layout.setSpacing(20)
-        main_layout.setContentsMargins(20, 20, 20, 20)
         self.setLayout(main_layout)
 
         # Logo
@@ -71,13 +61,11 @@ class MFRC522Plugin(QWidget):
             self.logo_label.setPixmap(pixmap)
             self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         main_layout.addWidget(self.logo_label)
-        main_layout.addStretch(1)  # push the grid higher
+        main_layout.addStretch(1)  # move grid higher
 
-        # Checkbox grid with semi-transparent background
+        # Checkbox grid
         self.grid_widget = QWidget()
-        self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,80); border-radius: 10px;")
         self.grid_layout = QGridLayout()
-        self.grid_layout.setSpacing(10)
         self.grid_widget.setLayout(self.grid_layout)
         main_layout.addWidget(self.grid_widget)
 
@@ -104,7 +92,6 @@ class MFRC522Plugin(QWidget):
         # Clipboard feedback
         self.feedback_label = QLabel("")
         self.feedback_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.feedback_label.setStyleSheet("color: yellow; font-weight: bold;")
         main_layout.addWidget(self.feedback_label)
 
     def checkbox_clicked(self):
@@ -148,6 +135,7 @@ class MFRC522Plugin(QWidget):
                 cb.setChecked(False)
                 cb.setEnabled(True)
                 if page_cards[i] == highlight_uid:
+                    # Flash animation
                     cb.setStyleSheet("color: green; font-weight: bold; font-size: 16px;")
                     QTimer.singleShot(FLASH_DURATION_MS, lambda cb=cb: cb.setStyleSheet("color: lightgrey; font-size: 16px;"))
                 else:
