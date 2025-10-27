@@ -41,6 +41,41 @@ for name, cfg in raw_apps.items():
     cfg["name"] = name
     apps.append(cfg)
 
+# ---------- Ensure close btn ----------
+    def ensure_close_btn(self):
+        """
+        Ensure a valid floating close button exists. Recreate if missing or deleted.
+        This helps avoid Qt hiding it when plugin windows are shown.
+        """
+        # If we already have one and it's a valid QWidget, leave it
+        if getattr(self, "close_btn", None) and isinstance(self.close_btn, QWidget):
+            # If it's hidden (maybe destroyed by plugin), recreate
+            try:
+                if self.close_btn.isHidden() or not self.close_btn.parent():
+                    # we'll recreate below
+                    self.close_btn.deleteLater()
+                    self.close_btn = None
+                else:
+                    return
+            except Exception:
+                try:
+                    self.close_btn.deleteLater()
+                except Exception:
+                    pass
+                self.close_btn = None
+
+        # Create a fresh close button (no parent)
+        try:
+            self.close_btn = FloatingCloseButton(self.close_current)
+        except Exception as e:
+            log(f"[ensure_close_btn] failed to create: {e}")
+            self.close_btn = None
+            return
+
+        # position, but note move expects screen coords
+        self._position_close_btn()
+        self.close_btn.hide()
+
 
 # ---------- Plugin Loader ----------
 def load_plugin(app_name, app_data, parent=None):
@@ -102,6 +137,10 @@ class FloatingCloseButton(QPushButton):
             Qt.WindowType.Tool |
             Qt.WindowType.NoDropShadowWindowHint
         )
+        # do not take focus when shown
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        # allow transparent backgrounds if style uses them
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
         # Fade animation support
         self.fade_effect = QGraphicsOpacityEffect(self)
@@ -111,18 +150,29 @@ class FloatingCloseButton(QPushButton):
         self.anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
     def fade_in(self):
+        # show without activating and bring to top
         self.show()
         self.anim.stop()
         self.anim.setStartValue(0.0)
         self.anim.setEndValue(1.0)
         self.anim.start()
+        # make sure it stays on top
+        self.raise_()
 
     def fade_out(self):
         def hide_after():
-            self.hide()
+            try:
+                self.hide()
+            except Exception:
+                pass
         self.anim.stop()
         self.anim.setStartValue(1.0)
         self.anim.setEndValue(0.0)
+        # disconnect previous connections to avoid multiple triggers
+        try:
+            self.anim.finished.disconnect()
+        except Exception:
+            pass
         self.anim.finished.connect(hide_after)
         self.anim.start()
 
@@ -439,8 +489,10 @@ class OverlayLauncher(QWidget):
         self.ui_container.move(0, 0)
         self.overlay.move(0, 0)
         self.overlay.hide()
+        self.ensure_close_btn()
         self._position_close_btn()
-        self.close_btn.fade_in()
+        if self.close_btn:
+            self.close_btn.fade_in()
         self.raise_timer.start(100)
 
     # ---------- Plugin ----------
@@ -458,8 +510,10 @@ class OverlayLauncher(QWidget):
         widget.setGeometry(x, y, w, h)
         widget.show()
         widget.raise_()
+        self.ensure_close_btn()
         self._position_close_btn()
-        self.close_btn.fade_in()
+        if self.close_btn:
+            self.close_btn.fade_in()
         self.raise_timer.start(100)
         self.current_plugin = widget
 
