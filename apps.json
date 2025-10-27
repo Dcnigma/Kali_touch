@@ -1,8 +1,7 @@
-
 {
   "Qflipper": {
     "cmd": "/usr/bin/flatpak run --branch=stable --arch=aarch64 --command=qFlipper one.flipperzero.qFlipper",
-   "touch_icon": "icons/qflipper.png" ,   
+    "touch_icon": "icons/qflipper.png",
     "x": 100,
     "y": 50,
     "width": 800,
@@ -10,80 +9,27 @@
   },
   "mousepad": {
     "cmd": "Mousepad",
+    "touch_icon": "icons/Textedit.png",
     "x": 0,
     "y": 0,
     "width": 940,
     "height": 800
   },
-   "Mozilla Firefox": {
+  "Mozilla Firefox": {
     "cmd": "firefox",
-    
+    "touch_icon": "icons/firefox.png",
     "x": 0,
     "y": 0,
     "width": 940,
     "height": 800
-  }, 
+  },
   "Nmap Scan": {
-  "plugin": "plugins.nmap_plugin:NmapPlugin",
-  "touch_icon": "icons/qflipper.png"
-  },  
-  "Qflipper1": {
-    "cmd": "/usr/bin/flatpak run --branch=stable --arch=aarch64 --command=qFlipper one.flipperzero.qFlipper",
-    
-    "x": 100,
-    "y": 50,
-    "width": 800,
-    "height": 600
+    "plugin": "plugins.nmap_plugin:NmapPlugin",
+    "touch_icon": "icons/nmap.png"
   },
-  "mousepad1": {
-    "cmd": "Mousepad",
-    "x": 0,
-    "y": 0,
-    "width": 940,
-    "height": 800
-  },
-   "Mozilla Firefox1": {
-    "cmd": "firefox",
-    
-    "x": 0,
-    "y": 0,
-    "width": 940,
-    "height": 800
-  }, 
-  "Nmap Scan66": {
-  "plugin": "plugins.nmap_plugin:NmapPlugin",
-  "touch_icon": "icons/nmap.png"
-  },
-  "Qflipper2": {
-    "cmd": "/usr/bin/flatpak run --branch=stable --arch=aarch64 --command=qFlipper one.flipperzero.qFlipper",
- 
-    "x": 100,
-    "y": 50,
-    "width": 800,
-    "height": 600
-  },
-  "mousepad2": {
-    "cmd": "Mousepad",
-    "x": 0,
-    "y": 0,
-    "width": 1024,
-    "height": 800
-  },
-   "Mozilla Firefox2": {
-    "cmd": "firefox",
-    
-    "x": 0,
-    "y": 0,
-    "width": 940,
-    "height": 800
-  }, 
-"Nmap Scan5": {
-  "plugin": "plugins.nmap_plugin:NmapPlugin",
-  "touch_icon": "icons/nmap.png"
-},
   "dirbuster4": {
     "cmd": "dirbuster",
-    
+    "touch_icon": "icons/dirbuster.png",
     "x": 0,
     "y": 0,
     "width": 940,
