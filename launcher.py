@@ -413,9 +413,9 @@ class OverlayLauncher(QWidget):
                 # Showcase 3 layout: big tile, icon on top, text below
                 tile = QWidget()
                 vbox = QVBoxLayout(tile)
-                vbox.setSpacing(52)
+                vbox.setSpacing(12)
                 vbox.setContentsMargins(8, 8, 8, 8)
-                tile.setFixedSize(200, 200)
+                tile.setFixedSize(250, 200)
                 tile.setStyleSheet("""
                     QWidget {
                         background-color: #3a3a3a;
@@ -429,7 +429,7 @@ class OverlayLauncher(QWidget):
                 icon_label = QLabel()
                 icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 if icon_path and os.path.exists(icon_path):
-                    pix = QPixmap(icon_path).scaled(200, 200, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                    pix = QPixmap(icon_path).scaled(150, 150, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
                     icon_label.setPixmap(pix)
                 else:
                     icon_label.setText("📦")
