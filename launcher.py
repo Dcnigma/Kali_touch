@@ -413,7 +413,7 @@ class OverlayLauncher(QWidget):
                 # Showcase 3 layout: big tile, icon on top, text below
                 tile = QWidget()
                 vbox = QVBoxLayout(tile)
-                vbox.setSpacing(12)
+                vbox.setSpacing(52)
                 vbox.setContentsMargins(8, 8, 8, 8)
                 tile.setFixedSize(200, 200)
                 tile.setStyleSheet("""
