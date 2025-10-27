@@ -109,15 +109,31 @@ class FloatingCloseButton(QPushButton):
         self.anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
     def fade_in(self):
+        # make sure no old fade_out finished handlers will hide us
+        try:
+            self.anim.finished.disconnect()
+        except Exception:
+            pass
         self.show()
         self.anim.stop()
         self.anim.setStartValue(0.0)
         self.anim.setEndValue(1.0)
         self.anim.start()
-
+        self.raise_()
+        
     def fade_out(self):
+        # disconnect any previous connections first
+        try:
+            self.anim.finished.disconnect()
+        except Exception:
+            pass
+
         def hide_after():
-            self.hide()
+            try:
+                self.hide()
+            except Exception:
+                pass
+
         self.anim.stop()
         self.anim.setStartValue(1.0)
         self.anim.setEndValue(0.0)
