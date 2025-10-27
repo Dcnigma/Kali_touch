@@ -414,7 +414,7 @@ class OverlayLauncher(QWidget):
                 tile = QWidget()
                 vbox = QVBoxLayout(tile)
                 vbox.setSpacing(12)
-                vbox.setContentsMargins(8, 8, 8, 8)
+                vbox.setContentsMargins(8, 18, 8, 8)
                 tile.setFixedSize(250, 200)
                 tile.setStyleSheet("""
                     QWidget {
