@@ -1,87 +1,101 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-
-import sys
 import os
+import sys
 import signal
 import time
-from PyQt6.QtWidgets import QApplication, QWidget, QLabel, QVBoxLayout
-from PyQt6.QtCore import QTimer, Qt
+from PyQt6 import QtWidgets, QtCore
 
-# Ensure plugin folder is in sys.path so MFRC522.py can be imported
+# ---------- Ensure MFRC522.py is importable ----------
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
-if plugin_folder not in sys.path:
+mfrc522_path = os.path.join(plugin_folder, "MFRC522.py")
+if os.path.exists(mfrc522_path) and plugin_folder not in sys.path:
     sys.path.insert(0, plugin_folder)
 
 try:
     import MFRC522
+    MFRC522_AVAILABLE = True
 except ImportError:
+    MFRC522_AVAILABLE = False
     print("MFRC522 Python library not available on this system.")
     print("Place MFRC522.py in the same folder as this plugin to read cards.")
-    MFRC522 = None
 
-# Function to convert UID to string
+# ---------- Helper Functions ----------
 def uidToString(uid):
-    return ''.join(format(i, '02X') for i in uid)
+    """Convert UID list to string."""
+    return "".join(format(i, "02X") for i in uid)
 
-# Flag to control reading loop
-continue_reading = True
-
-# Capture SIGINT to cleanly stop
-def end_read(signal_received, frame):
-    global continue_reading
-    print("Ctrl+C captured, ending read.")
-    continue_reading = False
-
-signal.signal(signal.SIGINT, end_read)
-
-class MFRC522Plugin(QWidget):
+# ---------- PyQt6 Plugin ----------
+class MFRC522Plugin(QtWidgets.QWidget):
     def __init__(self, parent=None, apps=None, cfg=None):
         super().__init__(parent)
         self.setWindowTitle("RFID Reader")
         self.resize(800, 900)
 
-        # Layout and label
-        layout = QVBoxLayout()
-        self.label = QLabel("No card detected")
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.label.setStyleSheet("font-size: 24px;")
-        layout.addWidget(self.label)
-        self.setLayout(layout)
-
         self.cfg = cfg
-        self.apps = apps
+        self.continue_reading = True
 
-        # Setup reader if available
-        if MFRC522:
+        # UI: label
+        self.label = QtWidgets.QLabel("No card detected", self)
+        self.label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self.label.setGeometry(50, 400, 700, 100)
+        font = self.label.font()
+        font.setPointSize(24)
+        self.label.setFont(font)
+
+        # Only start RFID thread if library is available
+        if MFRC522_AVAILABLE:
             self.reader = MFRC522.MFRC522()
+            self.thread = QtCore.QThread()
+            self.worker = RFIDWorker(self.reader)
+            self.worker.moveToThread(self.thread)
+            self.thread.started.connect(self.worker.run)
+            self.worker.card_detected.connect(self.on_card_detected)
+            self.thread.start()
         else:
-            self.reader = None
-            self.label.setText("MFRC522 library not found!")
+            self.label.setText("MFRC522.py not found!\nCannot read cards.")
 
-        # Timer to poll for cards every 200ms
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.poll_card)
-        self.timer.start(200)
+        # Handle closing
+        self.destroyed.connect(self.cleanup)
 
-    def poll_card(self):
-        if not self.reader:
-            return
+    def on_card_detected(self, uid):
+        self.label.setText(f"Card detected: {uid}")
 
-        (status, _) = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
-        if status == self.reader.MI_OK:
-            (status, uid) = self.reader.MFRC522_SelectTagSN()
+    def cleanup(self):
+        if MFRC522_AVAILABLE:
+            self.worker.stop()
+            self.thread.quit()
+            self.thread.wait()
+
+# ---------- RFID Worker Thread ----------
+class RFIDWorker(QtCore.QObject):
+    card_detected = QtCore.pyqtSignal(str)
+
+    def __init__(self, reader):
+        super().__init__()
+        self.reader = reader
+        self.continue_reading = True
+
+    def run(self):
+        # Capture SIGINT when running standalone
+        signal.signal(signal.SIGINT, self.end_read)
+
+        while self.continue_reading:
+            (status, _) = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
             if status == self.reader.MI_OK:
-                self.label.setText(f"Card detected!\nUID: {uidToString(uid)}")
-            else:
-                self.label.setText("Authentication error")
-        else:
-            self.label.setText("No card detected")
+                (status, uid) = self.reader.MFRC522_SelectTagSN()
+                if status == self.reader.MI_OK:
+                    self.card_detected.emit(uidToString(uid))
+            time.sleep(0.5)
 
+    def stop(self):
+        self.continue_reading = False
 
-# Standalone mode
+    def end_read(self, signal_num, frame):
+        self.continue_reading = False
+
+# ---------- Standalone Launch ----------
 if __name__ == "__main__":
-    app = QApplication(sys.argv)
+    app = QtWidgets.QApplication(sys.argv)
     window = MFRC522Plugin()
     window.show()
     sys.exit(app.exec())
