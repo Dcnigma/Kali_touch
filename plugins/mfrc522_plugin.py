@@ -1,59 +1,45 @@
 #!/usr/bin/env python3
+# mfrc522_plugin.py
+
 import os
 import sys
-import signal
 import time
-import datetime
 
-# Ensure current plugin folder is in sys.path so MFRC522.py is found
-sys.path.insert(0, os.path.dirname(__file__))
-
+# Make sure MFRC522.py is in the same folder
 try:
-    import MFRC522
-    MFRC522_AVAILABLE = True
+    from MFRC522 import MFRC522
 except ImportError:
-    MFRC522_AVAILABLE = False
+    print("MFRC522 Python library not available on this system.")
+    print("Place MFRC522.py in the same folder as this plugin to read cards.")
+    MFRC522 = None
 
-if not MFRC522_AVAILABLE:
-    print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
-          "MFRC522 Python library not available on this system. "
-          "Plugin will still load but cannot read cards.")
-    # Stop here since we can't read cards
-    sys.exit(0)
+# Only proceed if MFRC522 is available
+if MFRC522:
+    # Initialize the reader
+    reader = MFRC522()
 
-continue_reading = True
+    def uidToString(uid):
+        """Convert UID list to hex string."""
+        return ''.join(format(x, '02X') for x in uid)
 
-# Function to convert UID list to string
-def uidToString(uid):
-    return ''.join(format(i, '02X') for i in uid[::-1])  # reversed like your read.py
+    def scan_card():
+        """Scan for a card once and return UID string if found."""
+        status, _ = reader.MFRC522_Request(reader.PICC_REQIDL)
+        if status == reader.MI_OK:
+            status, uid = reader.MFRC522_SelectTagSN()
+            if status == reader.MI_OK:
+                return uidToString(uid)
+        return None
 
-# Capture SIGINT for cleanup when the script is aborted
-def end_read(signal, frame):
-    global continue_reading
-    print("Ctrl+C captured, ending read.")
-    continue_reading = False
-
-# Hook the SIGINT
-signal.signal(signal.SIGINT, end_read)
-
-# Create an object of the MFRC522 class
-MIFAREReader = MFRC522.MFRC522()
-
-# Welcome message
-print("Welcome to the MFRC522 plugin reader")
-print("Press Ctrl-C to stop.")
-
-# Main loop to scan for cards
-while continue_reading:
-    (status, TagType) = MIFAREReader.MFRC522_Request(MIFAREReader.PICC_REQIDL)
-    
-    if status == MIFAREReader.MI_OK:
-        print("Card detected")
-        
-        (status, uid) = MIFAREReader.MFRC522_SelectTagSN()
-        if status == MIFAREReader.MI_OK:
-            print(f"Card read UID: {uidToString(uid)}")
-        else:
-            print("Authentication error")
-    
-    time.sleep(0.5)  # small delay to reduce CPU usage
+    # This is an example function for the plugin UI to call repeatedly
+    def plugin_loop(update_ui_callback):
+        """
+        Call this function repeatedly from your plugin main loop.
+        update_ui_callback should be a function that takes the UID string
+        or None if no card is present.
+        """
+        while True:
+            uid = scan_card()
+            if uid:
+                update_ui_callback(uid)
+            time.sleep(0.1)  # Adjust scan frequency as needed
