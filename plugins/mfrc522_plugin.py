@@ -1,102 +1,148 @@
 #!/usr/bin/env python3
 import os
 import sys
-import time
-from PyQt6 import QtWidgets, QtCore
+from PyQt6.QtWidgets import (
+    QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QApplication
+)
+from PyQt6.QtGui import QPixmap, QColor, QPalette
+from PyQt6.QtCore import Qt, QTimer, QMimeData
+from PyQt6.QtGui import QClipboard
 
-# ---------- Auto-detect MFRC522.py ----------
-def find_mfrc522():
-    """Try to locate MFRC522.py automatically."""
-    possible_folders = [
-        os.path.dirname(os.path.abspath(__file__)),  # plugin folder
-        os.getcwd(),                                # current working dir
-    ]
-    for folder in possible_folders:
-        candidate = os.path.join(folder, "MFRC522.py")
-        if os.path.isfile(candidate):
-            if folder not in sys.path:
-                sys.path.insert(0, folder)
-            return True, folder
-    return False, None
+# Ensure plugin folder is in sys.path
+plugin_folder = os.path.dirname(os.path.abspath(__file__))
+if plugin_folder not in sys.path:
+    sys.path.insert(0, plugin_folder)
 
-MFRC522_AVAILABLE, mfrc_folder = find_mfrc522()
-if MFRC522_AVAILABLE:
+# Try to import MFRC522
+try:
     import MFRC522
-    print(f"=== DEBUG INFO ===\nMFRC522.py found in: {mfrc_folder}\n==================")
-else:
-    print("MFRC522 Python library not available on this system.")
-    print("Place MFRC522.py in the same folder as this plugin or launcher to read cards.")
+    LIB_AVAILABLE = True
+except ImportError:
+    LIB_AVAILABLE = False
 
-# ---------- Helper ----------
-def uidToString(uid):
-    """Convert UID list to string."""
-    return "".join(format(i, "02X") for i in uid)
+CARDS_PER_PAGE = 16  # 2 columns x 8 rows
+COLUMNS = 2
+ROWS = 8
 
-# ---------- PyQt6 Plugin ----------
-class MFRC522Plugin(QtWidgets.QWidget):
+class MFRC522Plugin(QWidget):
     def __init__(self, parent=None, apps=None, cfg=None):
         super().__init__(parent)
-        self.setWindowTitle("RFID Reader")
-        self.resize(800, 900)
-
         self.cfg = cfg
-
-        # UI label
-        self.label = QtWidgets.QLabel("No card detected", self)
-        self.label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.label.setGeometry(50, 400, 700, 100)
-        font = self.label.font()
-        font.setPointSize(24)
-        self.label.setFont(font)
-
-        # Start RFID thread if available
-        if MFRC522_AVAILABLE:
-            self.reader = MFRC522.MFRC522()
-            self.thread = QtCore.QThread()
-            self.worker = RFIDWorker(self.reader)
-            self.worker.moveToThread(self.thread)
-            self.thread.started.connect(self.worker.run)
-            self.worker.card_detected.connect(self.on_card_detected)
-            self.thread.start()
-        else:
-            self.label.setText("MFRC522.py not found!\nCannot read cards.")
-
-        # Cleanup when closing
-        self.destroyed.connect(self.cleanup)
-
-    def on_card_detected(self, uid):
-        self.label.setText(f"Card detected: {uid}")
-
-    def cleanup(self):
-        if MFRC522_AVAILABLE:
-            self.worker.stop()
-            self.thread.quit()
-            self.thread.wait()
-
-# ---------- RFID Worker ----------
-class RFIDWorker(QtCore.QObject):
-    card_detected = QtCore.pyqtSignal(str)
-
-    def __init__(self, reader):
-        super().__init__()
-        self.reader = reader
+        self.setWindowTitle("RFID Reader")
+        self.setFixedSize(800, 900)
+        self.cards = []  # List of scanned card UIDs
+        self.page = 0
+        self.checkboxes = []
         self.continue_reading = True
 
-    def run(self):
-        while self.continue_reading:
-            (status, _) = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
+        self.init_ui()
+
+        if LIB_AVAILABLE:
+            self.reader = MFRC522.MFRC522()
+        else:
+            self.log_message("MFRC522 Python library not available on this system.\nPlace MFRC522.py in the same folder as this plugin to read cards.")
+
+        # Timer to poll cards
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check_card)
+        self.timer.start(500)
+
+    def init_ui(self):
+        main_layout = QVBoxLayout()
+        self.setLayout(main_layout)
+
+        # Logo
+        self.logo_label = QLabel(self)
+        logo_path = os.path.join(plugin_folder, "logo.png")
+        if os.path.exists(logo_path):
+            pixmap = QPixmap(logo_path).scaled(200, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.logo_label.setPixmap(pixmap)
+            self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(self.logo_label)
+
+        # Checkbox grid
+        self.grid_widget = QWidget()
+        self.grid_layout = QGridLayout()
+        self.grid_widget.setLayout(self.grid_layout)
+        main_layout.addWidget(self.grid_widget)
+
+        for i in range(ROWS):
+            for j in range(COLUMNS):
+                cb = QCheckBox("")
+                cb.setStyleSheet("color: lightgrey; font-size: 16px;")
+                cb.stateChanged.connect(self.checkbox_clicked)
+                self.grid_layout.addWidget(cb, i, j)
+                self.checkboxes.append(cb)
+
+        # Pagination buttons
+        pagination_layout = QHBoxLayout()
+        self.prev_button = QPushButton("Previous")
+        self.prev_button.clicked.connect(self.prev_page)
+        self.next_button = QPushButton("Next")
+        self.next_button.clicked.connect(self.next_page)
+        pagination_layout.addWidget(self.prev_button)
+        pagination_layout.addWidget(self.next_button)
+        main_layout.addLayout(pagination_layout)
+
+    def checkbox_clicked(self):
+        cb = self.sender()
+        if cb.text():
+            clipboard = QApplication.clipboard()
+            clipboard.setText(cb.text())
+
+    def log_message(self, text):
+        print(text)  # optional console log
+
+    def uid_to_string(self, uid):
+        return ''.join(format(i, '02X') for i in uid)
+
+    def check_card(self):
+        if not LIB_AVAILABLE:
+            return
+
+        status, tag_type = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
+        if status == self.reader.MI_OK:
+            status, uid = self.reader.MFRC522_SelectTagSN()
             if status == self.reader.MI_OK:
-                (status, uid) = self.reader.MFRC522_SelectTagSN()
-                if status == self.reader.MI_OK:
-                    self.card_detected.emit(uidToString(uid))
-            time.sleep(0.5)
+                uid_str = self.uid_to_string(uid)
+                if uid_str not in self.cards:
+                    self.cards.append(uid_str)
+                self.update_checkboxes(uid_str)
 
-    def stop(self):
-        self.continue_reading = False
+    def update_checkboxes(self, highlight_uid=None):
+        total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
+        self.page = min(self.page, total_pages - 1)
 
-# ---------- Standalone Launch ----------
-if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
-    window = MFRC522Plugin()
-    window.show()
-    sys.exit(app.exec())
+        start_index = self.page * CARDS_PER_PAGE
+        end_index = start_index + CARDS_PER_PAGE
+        page_cards = self.cards[start_index:end_index]
+
+        for i, cb in enumerate(self.checkboxes):
+            if i < len(page_cards):
+                cb.setText(page_cards[i])
+                if page_cards[i] == highlight_uid:
+                    cb.setStyleSheet("color: green; font-weight: bold; font-size: 16px;")
+                else:
+                    cb.setStyleSheet("color: lightgrey; font-size: 16px;")
+                cb.setChecked(False)
+                cb.setEnabled(True)
+            else:
+                cb.setText("")
+                cb.setChecked(False)
+                cb.setEnabled(False)
+
+        # If highlighted UID is not on current page, switch page
+        if highlight_uid and highlight_uid not in page_cards:
+            index = self.cards.index(highlight_uid)
+            self.page = index // CARDS_PER_PAGE
+            self.update_checkboxes(highlight_uid)
+
+    def next_page(self):
+        total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
+        self.page = (self.page + 1) % total_pages
+        self.update_checkboxes()
+
+    def prev_page(self):
+        total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
+        self.page = (self.page - 1 + total_pages) % total_pages
+        self.update_checkboxes()
