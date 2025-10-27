@@ -2,101 +2,86 @@
 import os
 import sys
 import time
-from PyQt6 import QtWidgets, QtCore
+import importlib
+from PyQt6.QtWidgets import QWidget, QLabel, QTextEdit, QVBoxLayout
+from PyQt6.QtGui import QPixmap, QColor, QPalette
+from PyQt6.QtCore import Qt, QTimer
 
-# ---------- Auto-detect MFRC522.py ----------
-def find_mfrc522():
-    """Try to locate MFRC522.py automatically."""
-    possible_folders = [
-        os.path.dirname(os.path.abspath(__file__)),  # plugin folder
-        os.getcwd(),                                # current working dir
-    ]
-    for folder in possible_folders:
-        candidate = os.path.join(folder, "MFRC522.py")
-        if os.path.isfile(candidate):
-            if folder not in sys.path:
-                sys.path.insert(0, folder)
-            return True, folder
-    return False, None
+# Dynamically ensure plugin folder is in sys.path
+plugin_folder = os.path.dirname(os.path.abspath(__file__))
+if plugin_folder not in sys.path:
+    sys.path.insert(0, plugin_folder)
 
-MFRC522_AVAILABLE, mfrc_folder = find_mfrc522()
-if MFRC522_AVAILABLE:
+# Try to import MFRC522
+try:
     import MFRC522
-    print(f"=== DEBUG INFO ===\nMFRC522.py found in: {mfrc_folder}\n==================")
-else:
-    print("MFRC522 Python library not available on this system.")
-    print("Place MFRC522.py in the same folder as this plugin or launcher to read cards.")
+    LIB_AVAILABLE = True
+except ImportError:
+    LIB_AVAILABLE = False
 
-# ---------- Helper ----------
-def uidToString(uid):
-    """Convert UID list to string."""
-    return "".join(format(i, "02X") for i in uid)
-
-# ---------- PyQt6 Plugin ----------
-class MFRC522Plugin(QtWidgets.QWidget):
+class MFRC522Plugin(QWidget):
     def __init__(self, parent=None, apps=None, cfg=None):
         super().__init__(parent)
-        self.setWindowTitle("RFID Reader")
-        self.resize(800, 900)
-
         self.cfg = cfg
-
-        # UI label
-        self.label = QtWidgets.QLabel("No card detected", self)
-        self.label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.label.setGeometry(50, 400, 700, 100)
-        font = self.label.font()
-        font.setPointSize(24)
-        self.label.setFont(font)
-
-        # Start RFID thread if available
-        if MFRC522_AVAILABLE:
-            self.reader = MFRC522.MFRC522()
-            self.thread = QtCore.QThread()
-            self.worker = RFIDWorker(self.reader)
-            self.worker.moveToThread(self.thread)
-            self.thread.started.connect(self.worker.run)
-            self.worker.card_detected.connect(self.on_card_detected)
-            self.thread.start()
-        else:
-            self.label.setText("MFRC522.py not found!\nCannot read cards.")
-
-        # Cleanup when closing
-        self.destroyed.connect(self.cleanup)
-
-    def on_card_detected(self, uid):
-        self.label.setText(f"Card detected: {uid}")
-
-    def cleanup(self):
-        if MFRC522_AVAILABLE:
-            self.worker.stop()
-            self.thread.quit()
-            self.thread.wait()
-
-# ---------- RFID Worker ----------
-class RFIDWorker(QtCore.QObject):
-    card_detected = QtCore.pyqtSignal(str)
-
-    def __init__(self, reader):
-        super().__init__()
-        self.reader = reader
+        self.setWindowTitle("RFID Reader")
+        self.setFixedSize(800, 900)
+        self.init_ui()
         self.continue_reading = True
+        self.last_uid = None
 
-    def run(self):
-        while self.continue_reading:
-            (status, _) = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
+        if LIB_AVAILABLE:
+            self.reader = MFRC522.MFRC522()
+        else:
+            self.log_message("MFRC522 Python library not available on this system.\nPlace MFRC522.py in the same folder as this plugin to read cards.")
+
+        # Timer for polling cards
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.check_card)
+        self.timer.start(500)  # every 500 ms
+
+    def init_ui(self):
+        layout = QVBoxLayout()
+        self.setLayout(layout)
+
+        # Background
+        self.setStyleSheet("background-color: #2b2b2b;")  # fallback if no image
+
+        # Logo
+        self.logo_label = QLabel(self)
+        logo_path = os.path.join(plugin_folder, "logo.png")  # put your PNG in plugin folder
+        if os.path.exists(logo_path):
+            pixmap = QPixmap(logo_path).scaled(200, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.logo_label.setPixmap(pixmap)
+            self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.logo_label)
+
+        # Log area
+        self.log_area = QTextEdit(self)
+        self.log_area.setReadOnly(True)
+        self.log_area.setStyleSheet("background-color: #1e1e1e; color: white; font-size: 16px;")
+        layout.addWidget(self.log_area)
+
+    def log_message(self, text, color="white"):
+        self.log_area.setTextColor(QColor(color))
+        self.log_area.append(text)
+
+    def uid_to_string(self, uid):
+        return ''.join(format(i, '02X') for i in uid)
+
+    def check_card(self):
+        if not LIB_AVAILABLE:
+            return
+
+        status, tag_type = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
+        if status == self.reader.MI_OK:
+            # Card detected
+            status, uid = self.reader.MFRC522_SelectTagSN()
             if status == self.reader.MI_OK:
-                (status, uid) = self.reader.MFRC522_SelectTagSN()
-                if status == self.reader.MI_OK:
-                    self.card_detected.emit(uidToString(uid))
-            time.sleep(0.5)
-
-    def stop(self):
-        self.continue_reading = False
-
-# ---------- Standalone Launch ----------
-if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
-    window = MFRC522Plugin()
-    window.show()
-    sys.exit(app.exec())
+                uid_str = self.uid_to_string(uid)
+                if uid_str != self.last_uid:
+                    self.last_uid = uid_str
+                    self.log_message(f"Card detected: {uid_str}", color="green")
+            else:
+                self.log_message("Authentication error", color="red")
+        else:
+            self.last_uid = None
