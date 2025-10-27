@@ -47,7 +47,7 @@ def load_plugin(app_name, app_data, parent=None):
     try:
         plugin_path = app_data.get("plugin")
         if not plugin_path:
-            log(f"[PLUGIN] âš  No plugin path for '{app_name}'")
+            log(f"[PLUGIN] ⚠ No plugin path for '{app_name}'")
             return None
 
         module_name, class_name = plugin_path.split(":")
@@ -73,7 +73,7 @@ def load_plugin(app_name, app_data, parent=None):
 
         return plugin_widget
     except Exception as e:
-        print(f"[PLUGIN] âŒ Failed to load '{app_name}': {e}")
+        print(f"[PLUGIN] ❌ Failed to load '{app_name}': {e}")
         traceback.print_exc()
         return None
 
@@ -81,7 +81,7 @@ def load_plugin(app_name, app_data, parent=None):
 # ---------- Floating Close Button with Fade ----------
 class FloatingCloseButton(QPushButton):
     def __init__(self, callback):
-        super().__init__("✕")  # top-level, no parent
+        super().__init__("✕")
         size = 75
         self.setFixedSize(size, size)
         self.setStyleSheet(f"""
@@ -95,19 +95,14 @@ class FloatingCloseButton(QPushButton):
             QPushButton:hover {{ background-color: rgba(200,0,0,220); }}
         """)
         self.clicked.connect(callback)
-
-        # Window flags: top-level tool window that stays on top
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
             Qt.WindowType.Tool
         )
-
-        # Don't grab focus when shown; allow transparent backgrounds
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
 
-        # Fade animation (opacity)
         self.fade_effect = QGraphicsOpacityEffect(self)
         self.setGraphicsEffect(self.fade_effect)
         self.anim = QPropertyAnimation(self.fade_effect, b"opacity")
@@ -115,7 +110,6 @@ class FloatingCloseButton(QPushButton):
         self.anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
     def fade_in(self):
-        # disconnect old handlers so a prior fade_out won't hide us later
         try:
             self.anim.finished.disconnect()
         except Exception:
@@ -125,14 +119,12 @@ class FloatingCloseButton(QPushButton):
         self.anim.setStartValue(0.0)
         self.anim.setEndValue(1.0)
         self.anim.start()
-        # explicit raise so WM knows we want topmost
         try:
             self.raise_()
         except Exception:
             pass
 
     def fade_out(self):
-        # disconnect old handlers first
         try:
             self.anim.finished.disconnect()
         except Exception:
@@ -147,10 +139,8 @@ class FloatingCloseButton(QPushButton):
         self.anim.stop()
         self.anim.setStartValue(1.0)
         self.anim.setEndValue(0.0)
-        # ensure only this connection is present
         self.anim.finished.connect(hide_after)
         self.anim.start()
-
 
 
 # ---------- Settings Dialog ----------
@@ -318,12 +308,12 @@ class OverlayLauncher(QWidget):
         right_container.addWidget(self.settings_btn)
 
         nav_style = "font-size:18px; background-color:#444; color:white; border-radius:8px; padding:8px 16px;"
-        self.prev_btn = QPushButton("â† Prev")
+        self.prev_btn = QPushButton("← Prev")
         self.prev_btn.setFixedSize(120, 64)
         self.prev_btn.setStyleSheet(nav_style)
         self.prev_btn.clicked.connect(self.prev_page)
 
-        self.next_btn = QPushButton("Next â†’")
+        self.next_btn = QPushButton("Next →")
         self.next_btn.setFixedSize(120, 64)
         self.next_btn.setStyleSheet(nav_style)
         self.next_btn.clicked.connect(self.next_page)
@@ -334,10 +324,8 @@ class OverlayLauncher(QWidget):
         ui_layout.addLayout(bottom_bar)
 
         # Floating close button (fade)
-        # Create floating close button as top-level (no parent)
         self.close_btn = FloatingCloseButton(self.close_current)
         self.close_btn.hide()
-        # position it once
         self._position_close_btn()
 
         self.raise_timer = QTimer(self)
@@ -374,31 +362,29 @@ class OverlayLauncher(QWidget):
 
     # ---------- Layout ----------
     def _position_close_btn(self):
-        """Position floating Close button relative to screen coordinates."""
         pad = 15
-        geo = self.geometry()  # absolute position of launcher window
+        geo = self.geometry()
         x = geo.x() + geo.width() - pad - self.close_btn.width()
         y = geo.y() + pad
         try:
             self.close_btn.move(x, y)
         except Exception:
             pass
-        def ensure_close_btn(self):
-        """If close_btn doesn't exist or was deleted, recreate it."""
+
+    def ensure_close_btn(self):
         if not getattr(self, "close_btn", None) or not isinstance(self.close_btn, QWidget):
             try:
                 self.close_btn = FloatingCloseButton(self.close_current)
             except Exception:
                 self.close_btn = None
                 return
-        # reposition and ensure on top
         self._position_close_btn()
         try:
             self.close_btn.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
             self.close_btn.raise_()
         except Exception:
             pass
-    
+
     def resizeEvent(self, ev):
         self.overlay.setGeometry(0, 0, self.width(), self.height())
         self.ui_container.setGeometry(0, 0, self.width(), self.height())
@@ -473,38 +459,33 @@ class OverlayLauncher(QWidget):
                 proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
             self.current_process = proc
             log(f"Launched PID {proc.pid}: {cmd}")
+            QTimer.singleShot(200, self.wait_for_window)
         except Exception as e:
             QMessageBox.warning(self, "Launch failed", str(e))
             self.overlay.hide()
             self.ui_container.show()
             return
 
-    #    QTimer.singleShot(600, self._finish_launch)
-    
-    def wait_for_window():
-    try:
-        if shutil.which("xdotool") and self.current_process:
-            pid = self.current_process.pid
-            # check if window exists for PID
-            out = subprocess.getoutput(f"xdotool search --pid {pid}")
-            if out.strip():
-                log(f"[LAUNCH] Window for PID {pid} detected → showing close button.")
+    def wait_for_window(self):
+        try:
+            if shutil.which("xdotool") and self.current_process:
+                pid = self.current_process.pid
+                out = subprocess.getoutput(f"xdotool search --pid {pid}")
+                if out.strip():
+                    log(f"[LAUNCH] Window for PID {pid} detected → showing close button.")
+                    self._finish_launch()
+                    return
+            if not hasattr(self, "_wait_tries"):
+                self._wait_tries = 0
+            self._wait_tries += 1
+            if self._wait_tries < 25:
+                QTimer.singleShot(200, self.wait_for_window)
+            else:
+                log("[LAUNCH] Timeout waiting for window; continuing anyway.")
                 self._finish_launch()
-                return
-        # retry a few times until window appears (up to ~5 seconds)
-        if not getattr(wait_for_window, "tries", 0):
-            wait_for_window.tries = 0
-        wait_for_window.tries += 1
-        if wait_for_window.tries < 25:
-            QTimer.singleShot(200, wait_for_window)
-        else:
-            log("[LAUNCH] Timeout waiting for window; continuing anyway.")
+        except Exception as e:
+            log(f"[LAUNCH] wait_for_window error: {e}")
             self._finish_launch()
-    except Exception as e:
-        log(f"[LAUNCH] wait_for_window error: {e}")
-        self._finish_launch()
-
-wait_for_window()
 
     def _finish_launch(self):
         self.move(0, 0)
@@ -528,59 +509,4 @@ wait_for_window()
     def launch_plugin(self, widget):
         w, h = 900, 700
         x = (self.SCREEN_W - w) // 2
-        y = (self.SCREEN_H - h) // 2
-        widget.setGeometry(x, y, w, h)
-        widget.show()
-        self.close_btn.raise_()
-        widget.raise_()
-        self.ensure_close_btn()
-        self._position_close_btn()
-        if self.close_btn:
-            self.close_btn.fade_in()
-        self.raise_timer.start(100)
-        self.current_plugin = widget
-
-    # ---------- Close ----------
-    def close_current(self):
-        if self.current_plugin:
-            try:
-                if hasattr(self.current_plugin, "on_close"):
-                    self.current_plugin.on_close()
-                self.current_plugin.close()
-            except Exception:
-                pass
-            self.current_plugin = None
-        if self.current_process:
-            try:
-                os.killpg(os.getpgid(self.current_process.pid), signal.SIGTERM)
-            except Exception:
-                pass
-            self.current_process = None
-        self.overlay.hide()
-        self.ui_container.show()
-        self.move(0, 0)
-        self._position_close_btn()
-        self.close_btn.fade_out()
-
-    def _raise_close_btn(self):
-        if self.close_btn.isVisible():
-            self.close_btn.raise_()
-        else:
-            self.raise_timer.stop()
-
-    def stop_launcher(self):
-        self.close_current()
-        QApplication.quit()
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-
-    # Show splash screen
-    splash = SplashScreen()
-    splash.show_splash()
-
-    launcher = OverlayLauncher(apps)
-    QTimer.singleShot(1800, launcher.show)
-
-    sys.exit(app.exec())
+        y = (self.SCREEN_H
