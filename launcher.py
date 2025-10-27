@@ -80,8 +80,8 @@ def load_plugin(app_name, app_data, parent=None):
 
 # ---------- Floating Close Button with Fade ----------
 class FloatingCloseButton(QPushButton):
-    def __init__(self, callback, parent=None):
-        super().__init__("âœ•", parent=parent)
+    def __init__(self, callback):
+        super().__init__("✕")  # top-level, no parent
         size = 75
         self.setFixedSize(size, size)
         self.setStyleSheet(f"""
@@ -95,13 +95,19 @@ class FloatingCloseButton(QPushButton):
             QPushButton:hover {{ background-color: rgba(200,0,0,220); }}
         """)
         self.clicked.connect(callback)
+
+        # Window flags: top-level tool window that stays on top
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
             Qt.WindowType.Tool
         )
 
-        # Fade effect
+        # Don't grab focus when shown; allow transparent backgrounds
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+
+        # Fade animation (opacity)
         self.fade_effect = QGraphicsOpacityEffect(self)
         self.setGraphicsEffect(self.fade_effect)
         self.anim = QPropertyAnimation(self.fade_effect, b"opacity")
@@ -109,7 +115,7 @@ class FloatingCloseButton(QPushButton):
         self.anim.setEasingCurve(QEasingCurve.Type.InOutQuad)
 
     def fade_in(self):
-        # make sure no old fade_out finished handlers will hide us
+        # disconnect old handlers so a prior fade_out won't hide us later
         try:
             self.anim.finished.disconnect()
         except Exception:
@@ -119,10 +125,14 @@ class FloatingCloseButton(QPushButton):
         self.anim.setStartValue(0.0)
         self.anim.setEndValue(1.0)
         self.anim.start()
-        self.raise_()
-        
+        # explicit raise so WM knows we want topmost
+        try:
+            self.raise_()
+        except Exception:
+            pass
+
     def fade_out(self):
-        # disconnect any previous connections first
+        # disconnect old handlers first
         try:
             self.anim.finished.disconnect()
         except Exception:
@@ -137,8 +147,10 @@ class FloatingCloseButton(QPushButton):
         self.anim.stop()
         self.anim.setStartValue(1.0)
         self.anim.setEndValue(0.0)
+        # ensure only this connection is present
         self.anim.finished.connect(hide_after)
         self.anim.start()
+
 
 
 # ---------- Settings Dialog ----------
@@ -322,8 +334,11 @@ class OverlayLauncher(QWidget):
         ui_layout.addLayout(bottom_bar)
 
         # Floating close button (fade)
-        self.close_btn = FloatingCloseButton(self.close_current, parent=self)
+        # Create floating close button as top-level (no parent)
+        self.close_btn = FloatingCloseButton(self.close_current)
         self.close_btn.hide()
+        # position it once
+        self._position_close_btn()
 
         self.raise_timer = QTimer(self)
         self.raise_timer.timeout.connect(self._raise_close_btn)
@@ -359,9 +374,31 @@ class OverlayLauncher(QWidget):
 
     # ---------- Layout ----------
     def _position_close_btn(self):
+        """Position floating Close button relative to screen coordinates."""
         pad = 15
-        self.close_btn.move(self.width() - pad - self.close_btn.width(), pad)
-
+        geo = self.geometry()  # absolute position of launcher window
+        x = geo.x() + geo.width() - pad - self.close_btn.width()
+        y = geo.y() + pad
+        try:
+            self.close_btn.move(x, y)
+        except Exception:
+            pass
+        def ensure_close_btn(self):
+        """If close_btn doesn't exist or was deleted, recreate it."""
+        if not getattr(self, "close_btn", None) or not isinstance(self.close_btn, QWidget):
+            try:
+                self.close_btn = FloatingCloseButton(self.close_current)
+            except Exception:
+                self.close_btn = None
+                return
+        # reposition and ensure on top
+        self._position_close_btn()
+        try:
+            self.close_btn.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
+            self.close_btn.raise_()
+        except Exception:
+            pass
+    
     def resizeEvent(self, ev):
         self.overlay.setGeometry(0, 0, self.width(), self.height())
         self.ui_container.setGeometry(0, 0, self.width(), self.height())
@@ -474,8 +511,10 @@ wait_for_window()
         self.ui_container.move(0, 0)
         self.overlay.move(0, 0)
         self.overlay.hide()
+        self.ensure_close_btn()
         self._position_close_btn()
-        self.close_btn.fade_in()
+        if self.close_btn:
+            self.close_btn.fade_in()
         self.raise_timer.start(100)
 
     # ---------- Plugin ----------
@@ -494,7 +533,10 @@ wait_for_window()
         widget.show()
         self.close_btn.raise_()
         widget.raise_()
-        self.close_btn.fade_in()
+        self.ensure_close_btn()
+        self._position_close_btn()
+        if self.close_btn:
+            self.close_btn.fade_in()
         self.raise_timer.start(100)
         self.current_plugin = widget
 
