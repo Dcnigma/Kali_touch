@@ -509,4 +509,62 @@ class OverlayLauncher(QWidget):
     def launch_plugin(self, widget):
         w, h = 900, 700
         x = (self.SCREEN_W - w) // 2
-        y = (self.SCREEN_H
+        y = (self.SCREEN_H - h) // 2
+        widget.setGeometry(x, y, w, h)
+        widget.show()
+        widget.raise_()
+        self.ensure_close_btn()
+        self._position_close_btn()
+        if self.close_btn:
+            self.close_btn.fade_in()
+        self.raise_timer.start(100)
+        self.current_plugin = widget
+
+    # ---------- Close ----------
+    def close_current(self):
+        if self.current_plugin:
+            try:
+                if hasattr(self.current_plugin, "on_close"):
+                    self.current_plugin.on_close()
+                self.current_plugin.close()
+            except Exception:
+                pass
+            self.current_plugin = None
+
+        if self.current_process:
+            try:
+                os.killpg(os.getpgid(self.current_process.pid), signal.SIGTERM)
+            except Exception:
+                pass
+            self.current_process = None
+
+        self.overlay.hide()
+        self.ui_container.show()
+        self.move(0, 0)
+        self._position_close_btn()
+        self.close_btn.fade_out()
+
+    def _raise_close_btn(self):
+        if self.close_btn and self.close_btn.isVisible():
+            self.close_btn.raise_()
+        else:
+            self.raise_timer.stop()
+
+    def stop_launcher(self):
+        self.close_current()
+        QApplication.quit()
+
+
+# ---------- Main entry ----------
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+
+    # Show splash screen
+    splash = SplashScreen()
+    splash.show_splash()
+
+    launcher = OverlayLauncher(apps)
+    QTimer.singleShot(1800, launcher.show)
+
+    sys.exit(app.exec())
+
