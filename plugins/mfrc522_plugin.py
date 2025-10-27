@@ -69,7 +69,7 @@ class MFRC522Plugin(QWidget):
         for i in range(ROWS):
             for j in range(COLUMNS):
                 cb = QCheckBox("")
-                cb.setStyleSheet("color: lightgrey; font-size: 16px;")
+                cb.setStyleSheet("color: lightgrey; font-size: 9px;")
                 cb.stateChanged.connect(self.checkbox_clicked)
                 self.grid_layout.addWidget(cb, i, j)
                 self.checkboxes.append(cb)
@@ -121,9 +121,9 @@ class MFRC522Plugin(QWidget):
             if i < len(page_cards):
                 cb.setText(page_cards[i])
                 if page_cards[i] == highlight_uid:
-                    cb.setStyleSheet("color: green; font-weight: bold; font-size: 16px;")
+                    cb.setStyleSheet("color: green; font-weight: bold; font-size: 10px;")
                 else:
-                    cb.setStyleSheet("color: lightgrey; font-size: 16px;")
+                    cb.setStyleSheet("color: lightgrey; font-size: 10px;")
                 cb.setChecked(False)
                 cb.setEnabled(True)
             else:
