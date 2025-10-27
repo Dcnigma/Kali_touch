@@ -261,6 +261,7 @@ class OverlayLauncher(QWidget):
         self.theme = self.load_theme()
         self.apply_theme(self.theme)
 
+
         # Overlay background
         self.overlay = QWidget(self)
         self.overlay.setGeometry(0, 0, self.SCREEN_W, self.SCREEN_H)
