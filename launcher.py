@@ -6,7 +6,7 @@ import subprocess
 import importlib
 import signal
 import traceback
-import shutil           # <--- fixed: previously missing
+import shutil
 from time import sleep
 
 from PyQt6.QtWidgets import (
@@ -54,7 +54,6 @@ def load_plugin(app_name, app_data, parent=None):
         module = importlib.import_module(module_name.strip())
         cls = getattr(module, class_name.strip())
 
-        # Try common constructor patterns
         try:
             plugin_widget = cls(parent=parent, apps=apps_dict, cfg=app_data)
         except TypeError:
@@ -76,11 +75,6 @@ def load_plugin(app_name, app_data, parent=None):
     except Exception as e:
         print(f"[PLUGIN] ❌ Failed to load '{app_name}': {e}")
         traceback.print_exc()
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Icon.Warning)
-        msg.setWindowTitle("Plugin Load Error")
-        msg.setText(f"Failed to load plugin '{app_name}'\n\nError:\n{e}")
-        msg.exec()
         return None
 
 
@@ -101,7 +95,6 @@ class FloatingCloseButton(QPushButton):
             QPushButton:hover {{ background-color: rgba(200,0,0,220); }}
         """)
         self.clicked.connect(callback)
-        # keep it above other windows, but as a tool widget of the main app
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
@@ -162,15 +155,15 @@ class OverlayLauncher(QWidget):
     def __init__(self, apps):
         super().__init__()
 
-        # Determine real screen size dynamically
         screen = QGuiApplication.primaryScreen()
         if screen:
             ssz = screen.size()
             self.SCREEN_W, self.SCREEN_H = ssz.width(), ssz.height()
         else:
-            # fallback defaults
             self.SCREEN_W, self.SCREEN_H = 1024, 800
 
+        # ensure pinned at 0,0 so no compositor offset
+        self.move(0, 0)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
         self.setFixedSize(self.SCREEN_W, self.SCREEN_H)
 
@@ -179,9 +172,8 @@ class OverlayLauncher(QWidget):
         self.apps_per_page = 9
         self.current_process = None
         self.current_plugin = None
-        self.last_launch_cfg = None
 
-        # Overlay background (semi transparent while launching)
+        # Overlay background
         self.overlay = QWidget(self)
         self.overlay.setGeometry(0, 0, self.SCREEN_W, self.SCREEN_H)
         self.overlay.setStyleSheet("background-color: rgba(0,0,0,200);")
@@ -196,18 +188,17 @@ class OverlayLauncher(QWidget):
         ui_layout.setSpacing(10)
         ui_layout.setContentsMargins(36, 20, 36, 18)
 
-        # App grid (3x3 -> 9)
+        # App grid
         self.grid = QGridLayout()
         self.grid.setSpacing(12)
         ui_layout.addLayout(self.grid)
-
         ui_layout.addItem(QSpacerItem(0, 0, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
         # ---------- Bottom bar ----------
         bottom_bar = QHBoxLayout()
         bottom_bar.setContentsMargins(8, 0, 8, 8)
 
-        # Stop Launcher button (bottom-left) = Close UI
+        # Stop Launcher button (Close UI)
         self.stop_btn = QPushButton("Stop Launcher")
         self.stop_btn.setFixedSize(180, 64)
         self.stop_btn.setStyleSheet("font-size:18px; background-color:#5a5a5a; color:white; border-radius:8px;")
@@ -216,22 +207,15 @@ class OverlayLauncher(QWidget):
 
         bottom_bar.addStretch(1)
 
-        # Page label center
+        # Center label
         self.page_label = QLabel()
         self.page_label.setStyleSheet("font-size:18px; color:white;")
         bottom_bar.addWidget(self.page_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         bottom_bar.addStretch(1)
 
-        # Right side: close UI (again), settings, prev, next
+        # Right side: Settings + navigation
         right_container = QHBoxLayout()
-
-        # Close UI (redundant to stop_btn but placed per request left of settings)
-        self.close_ui_btn = QPushButton("Close UI")
-        self.close_ui_btn.setFixedSize(140, 64)
-        self.close_ui_btn.setStyleSheet("font-size:16px; background-color:#7a7a7a; color:white; border-radius:8px;")
-        self.close_ui_btn.clicked.connect(self.stop_launcher)
-        right_container.addWidget(self.close_ui_btn)
 
         # Settings button
         self.settings_btn = QPushButton("Settings")
@@ -245,6 +229,7 @@ class OverlayLauncher(QWidget):
         self.prev_btn.setFixedSize(120, 64)
         self.prev_btn.setStyleSheet(nav_style)
         self.prev_btn.clicked.connect(self.prev_page)
+
         self.next_btn = QPushButton("Next →")
         self.next_btn.setFixedSize(120, 64)
         self.next_btn.setStyleSheet(nav_style)
@@ -252,42 +237,34 @@ class OverlayLauncher(QWidget):
 
         right_container.addWidget(self.prev_btn)
         right_container.addWidget(self.next_btn)
-
         bottom_bar.addLayout(right_container)
 
         ui_layout.addLayout(bottom_bar)
 
-        # Floating close button (top-right ~75x75)
+        # Floating close button
         self.close_btn = FloatingCloseButton(self.close_current, parent=self)
         self.close_btn.hide()
-        self._position_close_btn()  # initial position
+        self._position_close_btn()
 
-        # timer to raise the button above other windows
         self.raise_timer = QTimer(self)
         self.raise_timer.timeout.connect(self._raise_close_btn)
 
         self.show_page()
 
+    def _position_close_btn(self):
+        pad = 15
+        self.close_btn.move(self.width() - pad - self.close_btn.width(), pad)
+
     def resizeEvent(self, ev):
-        """Keep overlay and ui_container sized, reposition close button."""
         self.overlay.setGeometry(0, 0, self.width(), self.height())
         self.ui_container.setGeometry(0, 0, self.width(), self.height())
         self._position_close_btn()
         super().resizeEvent(ev)
 
-    def _position_close_btn(self):
-        padding = 15
-        x = self.width() - padding - self.close_btn.width()
-        y = padding
-        self.close_btn.move(x, y)
-
-    # ---------- Page Navigation ----------
+    # ---------- Page / Settings ----------
     def show_page(self):
         for i in reversed(range(self.grid.count())):
-            item = self.grid.itemAt(i)
-            if item is None:
-                continue
-            w = item.widget()
+            w = self.grid.itemAt(i).widget()
             if w:
                 w.setParent(None)
 
@@ -327,28 +304,26 @@ class OverlayLauncher(QWidget):
         self.page = (self.page - 1) % total
         self.show_page()
 
-    # ---------- Settings ----------
     def open_settings(self):
         dlg = SettingsDialog(self)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             QMessageBox.information(self, "Settings", "Settings saved.")
 
-    # ---------- Launch App (external process) ----------
+    # ---------- Launch app ----------
     def launch_app(self, cfg):
-        """Launch external command, then attempt to move/resize its window per cfg."""
-        self.close_current()
+        self.move(0, 0)  # always re-pin
+        self.ui_container.move(0, 0)
+        self.overlay.move(0, 0)
+        self.overlay.raise_()
+        self.close_btn.hide()
+
         self.ui_container.hide()
-        self.last_launch_cfg = cfg
-
-        cmd = cfg["cmd"]
-
-        # show overlay animation
         self.overlay.setWindowOpacity(0.0)
         self.overlay.show()
-        self.overlay.raise_()
+
         try:
             self.overlay_anim.stop()
-            self.overlay_anim.setDuration(200)
+            self.overlay_anim.setDuration(150)
             self.overlay_anim.setStartValue(0.0)
             self.overlay_anim.setEndValue(0.9)
             self.overlay_anim.start()
@@ -356,113 +331,30 @@ class OverlayLauncher(QWidget):
             pass
 
         try:
-            # If user provided a list, use it, otherwise treat as shell command
+            cmd = cfg["cmd"]
             if isinstance(cmd, (list, tuple)):
                 proc = subprocess.Popen(cmd, preexec_fn=os.setsid)
             else:
-                # Use shell so commands like "flatpak run ..." work as written in JSON
-                proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid,
-                                        stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                proc = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
             self.current_process = proc
             log(f"Launched PID {proc.pid}: {cmd}")
         except Exception as e:
-            QMessageBox.warning(self, "Launch failed", f"Failed to start:\n{e}")
+            QMessageBox.warning(self, "Launch failed", str(e))
             self.overlay.hide()
             self.ui_container.show()
-            self.current_process = None
             return
 
-        # Attempt to arrange the window after it appears with retries
-        attempts = 10
-        delay_ms = 300
+        QTimer.singleShot(600, lambda: self._finish_launch())
 
-        def try_arrange(attempt=0):
-            if self.current_process is None:
-                return
-            pid = self.current_process.pid
-            try:
-                arranged = self._arrange_window_by_pid(pid, cfg)
-            except Exception as e:
-                log(f"[ARRANGE] unexpected error: {e}")
-                arranged = False
+    def _finish_launch(self):
+        self.move(0, 0)
+        self.ui_container.move(0, 0)
+        self.overlay.move(0, 0)
+        self.overlay.hide()
+        self.close_btn.show()
+        self.raise_timer.start(100)
 
-            if arranged:
-                # success: show close button and stop attempts
-                self.overlay.hide()
-                self.close_btn.show()
-                self.raise_timer.start(100)
-            else:
-                if attempt + 1 < attempts:
-                    QTimer.singleShot(delay_ms, lambda: try_arrange(attempt + 1))
-                else:
-                    # final fallback: hide overlay, show close button anyway
-                    # and leave app running even if not repositioned
-                    self.overlay.hide()
-                    self.close_btn.show()
-                    self.raise_timer.start(100)
-                    # log stderr if command likely failed (non-zero) - but do not crash
-                    if self.current_process:
-                        try:
-                            out, err = self.current_process.communicate(timeout=0.1)
-                            if err:
-                                log(f"[PROC STDERR] {err.strip()}")
-                        except Exception:
-                            pass
-
-        QTimer.singleShot(500, lambda: try_arrange(0))
-
-    def _arrange_window_by_pid(self, pid, cfg):
-        """
-        Try to find windows belonging to pid and move/resize them using xdotool.
-        Returns True if at least one window arranged.
-        """
-        width = int(cfg.get("width", 0)) if cfg.get("width") else 0
-        height = int(cfg.get("height", 0)) if cfg.get("height") else 0
-        x = int(cfg.get("x", 0)) if cfg.get("x") is not None else None
-        y = int(cfg.get("y", 0)) if cfg.get("y") is not None else None
-
-        arranged_any = False
-
-        # Use xdotool if available
-        if shutil.which("xdotool"):
-            try:
-                cmd = f"xdotool search --pid {pid}"
-                proc = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=2)
-                out = proc.stdout.strip()
-                if out:
-                    wids = [w for w in out.splitlines() if w.strip()]
-                    for wid in wids:
-                        try:
-                            if width and height:
-                                subprocess.run(f"xdotool windowsize {wid} {width} {height}", shell=True)
-                            if x is not None and y is not None:
-                                subprocess.run(f"xdotool windowmove {wid} {x} {y}", shell=True)
-                            subprocess.run(f"xdotool windowactivate {wid}", shell=True)
-                            arranged_any = True
-                        except Exception as e:
-                            log(f"[xdotool] per-window error: {e}")
-            except Exception as e:
-                log(f"[xdotool] error: {e}")
-
-        # wmctrl fallback: activate by name and try to -e geometry
-        if not arranged_any and shutil.which("wmctrl"):
-            try:
-                title = cfg.get("name", "")
-                if title:
-                    subprocess.run(f"wmctrl -a \"{title}\"", shell=True)
-                if width and height:
-                    geom_x = x if x is not None else 0
-                    geom_y = y if y is not None else 0
-                    # gravity 0: default
-                    cmd = f"wmctrl -r :ACTIVE: -e 0,{geom_x},{geom_y},{width},{height}"
-                    subprocess.run(cmd, shell=True)
-                    arranged_any = True
-            except Exception as e:
-                log(f"[wmctrl] error: {e}")
-
-        return arranged_any
-
-    # ---------- Plugin Launch ----------
+    # ---------- Plugin handling ----------
     def _start_plugin_safe(self, cfg):
         widget = load_plugin(cfg.get("name", "Unknown"), cfg, parent=self)
         if widget:
@@ -471,60 +363,41 @@ class OverlayLauncher(QWidget):
             self.ui_container.show()
 
     def launch_plugin(self, widget):
-        cfg = getattr(widget, "cfg", {}) or {}
-        default_w, default_h = 900, 700
-        w = int(cfg.get("width", default_w)) if cfg.get("width") else default_w
-        h = int(cfg.get("height", default_h)) if cfg.get("height") else default_h
-        x = int(cfg.get("x", (self.SCREEN_W - w) // 2)) if cfg.get("x") is not None else (self.SCREEN_W - w) // 2
-        y = int(cfg.get("y", (self.SCREEN_H - h) // 2)) if cfg.get("y") is not None else (self.SCREEN_H - h) // 2
-
-        try:
-            widget.setGeometry(x, y, w, h)
-            widget.setWindowFlags(widget.windowFlags() | Qt.WindowType.Window)
-            widget.show()
-            widget.raise_()
-            widget.activateWindow()
-        except Exception as e:
-            log(f"[PLUGIN] show error: {e}")
-
-        self.overlay.hide()
+        w, h = 900, 700
+        x = (self.SCREEN_W - w) // 2
+        y = (self.SCREEN_H - h) // 2
+        widget.setGeometry(x, y, w, h)
+        widget.show()
+        widget.raise_()
         self.close_btn.show()
         self.raise_timer.start(100)
         self.current_plugin = widget
 
-    # ---------- Close / Stop ----------
+    # ---------- Close / stop ----------
     def close_current(self):
-        # Close plugin (call its on_close if present first)
         if self.current_plugin:
             try:
                 if hasattr(self.current_plugin, "on_close"):
-                    try:
-                        self.current_plugin.on_close()
-                    except Exception:
-                        pass
+                    self.current_plugin.on_close()
                 self.current_plugin.close()
             except Exception:
                 pass
             self.current_plugin = None
-
-        # Kill external process group
         if self.current_process:
             try:
                 os.killpg(os.getpgid(self.current_process.pid), signal.SIGTERM)
             except Exception:
                 pass
             self.current_process = None
-
         self.overlay.hide()
         self.ui_container.show()
+        self.move(0, 0)
+        self._position_close_btn()
         self.close_btn.hide()
 
     def _raise_close_btn(self):
         if self.close_btn.isVisible():
-            try:
-                self.close_btn.raise_()
-            except Exception:
-                pass
+            self.close_btn.raise_()
         else:
             self.raise_timer.stop()
 
