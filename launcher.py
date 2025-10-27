@@ -448,37 +448,6 @@ class OverlayLauncher(QWidget):
         super().resizeEvent(ev)
 
     # ---------- Page Handling ----------
-    def show_page(self):
-        for i in reversed(range(self.grid.count())):
-            w = self.grid.itemAt(i).widget()
-            if w:
-                w.setParent(None)
-
-        start = self.page * self.apps_per_page
-        end = start + self.apps_per_page
-        page_items = self.apps[start:end]
-
-        for idx, cfg in enumerate(page_items):
-            row, col = divmod(idx, 3)
-            name = cfg.get("name", "App")
-            btn = QPushButton(name)
-            btn.setFixedSize(220, 116)
-            btn.setStyleSheet("font-size:20px; background-color:#2f2f2f; color:white; border-radius:10px;")
-
-            icon_path = cfg.get("touch_icon")
-            if icon_path and os.path.exists(icon_path):
-                pix = QPixmap(icon_path).scaled(64, 64, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                btn.setIcon(QIcon(pix))
-                btn.setIconSize(QSize(64, 64))
-
-            if "cmd" in cfg:
-                btn.clicked.connect(lambda _, c=cfg: self.launch_app(c))
-            elif "plugin" in cfg:
-                btn.clicked.connect(lambda _, c=cfg: self._start_plugin_safe(c))
-            self.grid.addWidget(btn, row, col, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        total_pages = max(1, (len(self.apps) - 1) // self.apps_per_page + 1)
-        self.page_label.setText(f"Page {self.page + 1} / {total_pages}")
 
     def next_page(self):
         total = max(1, (len(self.apps) - 1) // self.apps_per_page + 1)
