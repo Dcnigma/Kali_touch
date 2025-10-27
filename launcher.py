@@ -81,7 +81,7 @@ def load_plugin(app_name, app_data, parent=None):
 # ---------- Floating Close Button with Fade ----------
 class FloatingCloseButton(QPushButton):
     def __init__(self, callback, parent=None):
-        super().__init__("✕", parent=parent)
+        super().__init__("✕")  # removed parent binding
         size = 75
         self.setFixedSize(size, size)
         self.setStyleSheet(f"""
@@ -95,11 +95,14 @@ class FloatingCloseButton(QPushButton):
             QPushButton:hover {{ background-color: rgba(200,0,0,220); }}
         """)
         self.clicked.connect(callback)
+        # Make it a *top-level* tool window — not a child
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint |
             Qt.WindowType.WindowStaysOnTopHint |
-            Qt.WindowType.Tool
+            Qt.WindowType.Tool |
+            Qt.WindowType.NoDropShadowWindowHint
         )
+
 
         # Fade effect
         self.fade_effect = QGraphicsOpacityEffect(self)
