@@ -415,7 +415,7 @@ class OverlayLauncher(QWidget):
                 vbox = QVBoxLayout(tile)
                 vbox.setSpacing(12)
                 vbox.setContentsMargins(8, 8, 8, 8)
-                tile.setFixedSize(360, 360)
+                tile.setFixedSize(200, 200)
                 tile.setStyleSheet("""
                     QWidget {
                         background-color: #3a3a3a;
