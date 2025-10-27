@@ -3,7 +3,6 @@ import os
 import sys
 import threading
 import datetime
-import MFRC522
 import signal
 from typing import Optional, List
 from PyQt6.QtWidgets import (
