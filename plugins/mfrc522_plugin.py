@@ -2,15 +2,15 @@
 import os
 import sys
 import threading
+import time
 import datetime
-import signal
 from typing import Optional, List
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTextEdit, QPushButton, QMessageBox
 )
 from PyQt6.QtCore import Qt
 
-# --- Ensure local MFRC522.py can be imported ---
+# --- Add local plugins folder to sys.path ---
 sys.path.append(os.path.dirname(__file__))
 
 try:
@@ -67,8 +67,7 @@ class MFRC522Plugin(QWidget):
 
         if not MFRC522_AVAILABLE:
             self.append(
-                "[{}] MFRC522 Python library not available on this system.\n"
-                "Plugin will still load but cannot read cards.\n".format(
+                "[{}] MFRC522.py not found. Place MFRC522.py in the same folder as this plugin to read cards.\n".format(
                     datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 )
             )
@@ -77,25 +76,23 @@ class MFRC522Plugin(QWidget):
         self.output.insertPlainText(text)
         self.output.verticalScrollBar().setValue(self.output.verticalScrollBar().maximum())
 
-    # ---------- Card reading logic ----------
+    # --- UID formatting ---
     def uid_to_string(self, uid: List[int]) -> str:
         return "".join(format(i, "02X") for i in uid)
 
+    # --- Card reading loop ---
     def read_loop(self):
         if not MFRC522_AVAILABLE:
             return
 
+        # equivalent of MIFAREReader = MFRC522.MFRC522()
         reader = MFRC522.MFRC522()
-        self.append("[{}] Ready to read cards. Press Stop to end.\n".format(
-            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ))
+        self.append("[{}] Ready to read cards.\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
         while self.continue_reading:
             (status, _) = reader.MFRC522_Request(reader.PICC_REQIDL)
             if status == reader.MI_OK:
-                self.append("[{}] Card detected\n".format(
-                    datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                ))
+                self.append("[{}] Card detected\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
                 (status, uid) = reader.MFRC522_SelectTagSN()
                 if status == reader.MI_OK:
                     self.append("[{}] Card read UID: {}\n\n".format(
@@ -103,20 +100,15 @@ class MFRC522Plugin(QWidget):
                         self.uid_to_string(uid)
                     ))
                 else:
-                    self.append("[{}] Authentication error\n".format(
-                        datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    ))
-            import time
+                    self.append("[{}] Authentication error\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
             time.sleep(0.5)
 
-        self.append("[{}] Stopped reading.\n".format(
-            datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ))
+        self.append("[{}] Stopped reading.\n".format(datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
 
     def start_reading(self):
         if not MFRC522_AVAILABLE:
-            QMessageBox.warning(self, "Missing library",
-                                "MFRC522.py not found. Cannot read cards.")
+            QMessageBox.warning(self, "Missing MFRC522.py",
+                                "MFRC522.py not found. Place MFRC522.py in the same folder as this plugin.")
             return
         self.continue_reading = True
         self.read_thread = threading.Thread(target=self.read_loop, daemon=True)
