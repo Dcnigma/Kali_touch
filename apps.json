@@ -15,6 +15,14 @@
     "width": 940,
     "height": 800
   },
+    "Metasploit": {
+    "cmd": "/usr/share/kali-menu/helper-scripts/metasploit-framework.sh",
+    "touch_icon": "icons/Textedit.png",
+    "x": 0,
+    "y": 0,
+    "width": 940,
+    "height": 800
+  },
   "Mozilla Firefox": {
     "cmd": "firefox",
     "touch_icon": "icons/firefox.png",
@@ -28,6 +36,44 @@
     "touch_icon": "icons/nmap.png",
     "x": 0,
     "y": 0    
+  },
+    "Kismet": {
+    "cmd": "/home/kali/Documents/kismet/kismet.sh",
+    "touch_icon": "icons/nmap.png",
+    "x": 0,
+    "y": 0    
+  },
+    "Legion": {
+    "cmd": "pkexec legion",
+    "touch_icon": "icons/dirbuster.png",
+    "x": 0,
+    "y": 0,
+    "width": 940,
+    "height": 800
+  },
+    "Wireshark": {
+    "cmd": "/usr/share/kali-menu/helper-scripts/wireshark.sh",
+    "touch_icon": "icons/dirbuster.png",
+    "x": 0,
+    "y": 0,
+    "width": 940,
+    "height": 800
+  },
+    "Gophish": {
+    "cmd": "/usr/share/kali-menu/exec-in-shell gophish",
+    "touch_icon": "icons/dirbuster.png",
+    "x": 0,
+    "y": 0,
+    "width": 940,
+    "height": 800
+  },
+    "Wall Of Flippers": {
+    "cmd": "/home/kali/Documents/Wall-of-Flippers/start.sh",
+    "touch_icon": "icons/wallofflipper.png",
+    "x": 0,
+    "y": 0,
+    "width": 940,
+    "height": 800
   },
   "dirbuster4": {
     "cmd": "dirbuster",
