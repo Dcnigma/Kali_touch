@@ -25,9 +25,9 @@
   },
   "Nmap Scan": {
     "plugin": "plugins.nmap_plugin:NmapPlugin",
-    "touch_icon": "icons/nmap.png"
+    "touch_icon": "icons/nmap.png",
     "x": 0,
-    "y": 0,    
+    "y": 0    
   },
   "dirbuster4": {
     "cmd": "dirbuster",
