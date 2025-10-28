@@ -368,7 +368,13 @@ class ImageEditorDialog(QDialog):
         self.selected_layer_id = None
         self.delete_btn.hide()
         self.update_display()
-
+    
+   def _get_layer(self, lid):
+        for L in self.layers:
+            if L['id'] == lid:
+                return L
+        return None
+   
     def _get_layer_at(self, img_x, img_y):
         # top-most hit test (reverse order)
         for L in reversed(self.layers):
