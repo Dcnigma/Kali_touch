@@ -4,7 +4,7 @@ import sys
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
 )
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QColor
 from PyQt6.QtCore import Qt, QTimer
 
 # Ensure plugin folder is in sys.path
@@ -22,6 +22,8 @@ except ImportError:
 CARDS_PER_PAGE = 16  # 2 columns x 8 rows
 COLUMNS = 2
 ROWS = 8
+ANIMATION_STEPS = 10
+ANIMATION_INTERVAL = 50  # ms
 
 class MFRC522Plugin(QWidget):
     def __init__(self, parent=None, apps=None, cfg=None):
@@ -33,6 +35,7 @@ class MFRC522Plugin(QWidget):
         self.page = 0
         self.checkboxes = []
         self.continue_reading = True
+        self.animations = {}  # uid -> current animation step
 
         self.init_ui()
 
@@ -45,11 +48,16 @@ class MFRC522Plugin(QWidget):
         self.timer.timeout.connect(self.check_card)
         self.timer.start(500)
 
+        # Animation timer
+        self.anim_timer = QTimer()
+        self.anim_timer.timeout.connect(self.update_animation)
+        self.anim_timer.start(ANIMATION_INTERVAL)
+
     def init_ui(self):
         main_layout = QVBoxLayout()
         self.setLayout(main_layout)
 
-        # Logo at top-left
+        # Logo
         self.logo_label = QLabel(self)
         logo_path = os.path.join(plugin_folder, "logo.png")
         if os.path.exists(logo_path):
@@ -58,23 +66,13 @@ class MFRC522Plugin(QWidget):
             self.logo_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         main_layout.addWidget(self.logo_label)
 
-        # Optional background
-        self.bg_label = QLabel(self)
-        bg_path = os.path.join(plugin_folder, "background.png")
-        if os.path.exists(bg_path):
-            pixmap = QPixmap(bg_path).scaled(self.width(), self.height(), Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
-            self.bg_label.setPixmap(pixmap)
-            self.bg_label.setGeometry(0, 0, self.width(), self.height())
-            self.bg_label.lower()
-
         # Grid container
         self.grid_widget = QWidget()
         self.grid_layout = QGridLayout()
         self.grid_widget.setLayout(self.grid_layout)
-        self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,100); border-radius: 10px;")
+        self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,50); border-radius: 10px;")
         main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignHCenter)
 
-        # Make checkboxes larger (3×)
         for i in range(ROWS):
             for j in range(COLUMNS):
                 cb = QCheckBox("")
@@ -83,7 +81,7 @@ class MFRC522Plugin(QWidget):
                 self.grid_layout.addWidget(cb, i, j)
                 self.checkboxes.append(cb)
 
-        # Pagination buttons
+        # Pagination
         pagination_layout = QHBoxLayout()
         self.prev_button = QPushButton("Previous")
         self.prev_button.clicked.connect(self.prev_page)
@@ -93,7 +91,6 @@ class MFRC522Plugin(QWidget):
         pagination_layout.addWidget(self.next_button)
         main_layout.addLayout(pagination_layout)
 
-        # Spacer at bottom
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
     def checkbox_clicked(self):
@@ -120,6 +117,7 @@ class MFRC522Plugin(QWidget):
                 uid_str = self.uid_to_string(uid)
                 if uid_str not in self.cards:
                     self.cards.append(uid_str)
+                self.animations[uid_str] = ANIMATION_STEPS  # trigger animation
                 self.update_checkboxes(uid_str)
 
     def update_checkboxes(self, highlight_uid=None):
@@ -133,10 +131,6 @@ class MFRC522Plugin(QWidget):
         for i, cb in enumerate(self.checkboxes):
             if i < len(page_cards):
                 cb.setText(page_cards[i])
-                if page_cards[i] == highlight_uid:
-                    cb.setStyleSheet("color: green; font-weight: bold; font-size: 18px; padding: 10px;")
-                else:
-                    cb.setStyleSheet("color: lightgrey; font-size: 18px; padding: 10px;")
                 cb.setChecked(False)
                 cb.setEnabled(True)
             else:
@@ -148,6 +142,18 @@ class MFRC522Plugin(QWidget):
             index = self.cards.index(highlight_uid)
             self.page = index // CARDS_PER_PAGE
             self.update_checkboxes(highlight_uid)
+
+    def update_animation(self):
+        for i, cb in enumerate(self.checkboxes):
+            uid = cb.text()
+            if uid in self.animations and self.animations[uid] > 0:
+                step = self.animations[uid]
+                green_value = int(255 * step / ANIMATION_STEPS)
+                cb.setStyleSheet(f"color: rgb(0,{green_value},0); font-size: 18px; padding: 10px;")
+                self.animations[uid] -= 1
+            elif uid in self.animations and self.animations[uid] <= 0:
+                cb.setStyleSheet("color: lightgrey; font-size: 18px; padding: 10px;")
+                del self.animations[uid]
 
     def next_page(self):
         total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
