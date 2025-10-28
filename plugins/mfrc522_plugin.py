@@ -66,7 +66,10 @@ class MFRC522Plugin(QWidget):
     def init_ui(self):
         main_layout = QVBoxLayout()
         self.setLayout(main_layout)
-
+        # Spacer between logo and grid
+        spacer = QWidget()
+        spacer.setFixedHeight(20)  # 20 pixels of space
+        main_layout.addWidget(spacer)
         # Logo top-left
         self.logo_label = QLabel(self)
         logo_path = os.path.join(plugin_folder, "logo.png")
