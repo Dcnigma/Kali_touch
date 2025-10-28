@@ -23,9 +23,6 @@ try:
 except ImportError:
     LIB_AVAILABLE = False
 
-CARDS_PER_PAGE = 8  # 2 columns x 4 rows
-COLUMNS = 2
-ROWS = 4
 VIDEO_FILE = os.path.join(plugin_folder, "videos.json")
 
 
@@ -52,10 +49,10 @@ class RfidPlayerPlugin(QWidget):
 
         # ---------------------- Data structures ----------------------
         self.video_map = {}
-        self.playing_videos = {}  # uid -> subprocess
-        self.current_uid = None
-
         self.load_videos()
+        self.current_uid = None
+        self.my_subprocess = None
+
         self.init_ui()
 
         if LIB_AVAILABLE:
@@ -182,28 +179,30 @@ class RfidPlayerPlugin(QWidget):
         return ''.join(format(i, '02X') for i in uid)
 
     # ---------------------- Video playback ----------------------
+    def stop_current_video(self):
+        try:
+            if self.my_subprocess:
+                self.my_subprocess.terminate()
+                self.my_subprocess.wait(timeout=0.5)
+        except Exception:
+            pass
+        self.my_subprocess = None
+
     def play_video_for_uid(self, uid_str):
         if uid_str in self.video_map:
             video_file = self.video_map[uid_str]
             if video_file.lower() == "stop":
-                self.stop_video(uid_str)
+                self.stop_current_video()
                 return
-            # Stop video for this UID if already playing
-            self.stop_video(uid_str)
             video_path = os.path.join(plugin_folder, video_file)
             if os.path.exists(video_path):
+                # Stop any previous video first
+                self.stop_current_video()
+                # Loop continuously
                 cmd = ("/bin/ffplay", "-fs", "-autoexit", "-loop", "0", video_path)
-                proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                self.playing_videos[uid_str] = proc
-
-    def stop_video(self, uid_str):
-        if uid_str in self.playing_videos:
-            try:
-                self.playing_videos[uid_str].terminate()
-            except Exception:
-                pass
-            time.sleep(0.2)
-            del self.playing_videos[uid_str]
+                self.my_subprocess = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                                     stdout=subprocess.PIPE,
+                                                     stderr=subprocess.PIPE)
 
     # ---------------------- Logging & clipboard ----------------------
     def log_message(self, text):
