@@ -4,9 +4,8 @@ import sys
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
 )
-from PyQt6.QtGui import QPixmap, QColor, QPalette
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QClipboard
 
 # Ensure plugin folder is in sys.path
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
@@ -30,7 +29,7 @@ class MFRC522Plugin(QWidget):
         self.cfg = cfg
         self.setWindowTitle("RFID Reader")
         self.setFixedSize(800, 900)
-        self.cards = []  # List of scanned card UIDs
+        self.cards = []
         self.page = 0
         self.checkboxes = []
         self.continue_reading = True
@@ -42,7 +41,6 @@ class MFRC522Plugin(QWidget):
         else:
             self.log_message("MFRC522 Python library not available on this system.\nPlace MFRC522.py in the same folder as this plugin to read cards.")
 
-        # Timer to poll cards
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_card)
         self.timer.start(500)
@@ -51,19 +49,16 @@ class MFRC522Plugin(QWidget):
         main_layout = QVBoxLayout()
         self.setLayout(main_layout)
 
-        # Top spacer for vertical centering
-        main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
-        # Logo
+        # Logo at top-left
         self.logo_label = QLabel(self)
         logo_path = os.path.join(plugin_folder, "logo.png")
         if os.path.exists(logo_path):
-            pixmap = QPixmap(logo_path).scaled(200, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            pixmap = QPixmap(logo_path).scaled(300, 75, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             self.logo_label.setPixmap(pixmap)
-            self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.logo_label, alignment=Qt.AlignmentFlag.AlignHCenter)
+            self.logo_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        main_layout.addWidget(self.logo_label)
 
-        # Optional background label
+        # Optional background
         self.bg_label = QLabel(self)
         bg_path = os.path.join(plugin_folder, "background.png")
         if os.path.exists(bg_path):
@@ -72,17 +67,18 @@ class MFRC522Plugin(QWidget):
             self.bg_label.setGeometry(0, 0, self.width(), self.height())
             self.bg_label.lower()
 
-        # Checkbox grid
+        # Grid container
         self.grid_widget = QWidget()
         self.grid_layout = QGridLayout()
         self.grid_widget.setLayout(self.grid_layout)
         self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,100); border-radius: 10px;")
         main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignHCenter)
 
+        # Make checkboxes larger (3×)
         for i in range(ROWS):
             for j in range(COLUMNS):
                 cb = QCheckBox("")
-                cb.setStyleSheet("color: lightgrey; font-size: 10px;")
+                cb.setStyleSheet("color: lightgrey; font-size: 18px; padding: 10px;")
                 cb.stateChanged.connect(self.checkbox_clicked)
                 self.grid_layout.addWidget(cb, i, j)
                 self.checkboxes.append(cb)
@@ -97,19 +93,18 @@ class MFRC522Plugin(QWidget):
         pagination_layout.addWidget(self.next_button)
         main_layout.addLayout(pagination_layout)
 
-        # Bottom spacer for vertical centering
+        # Spacer at bottom
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
     def checkbox_clicked(self):
         cb = self.sender()
         if cb.text():
             QApplication.clipboard().setText(cb.text())
-            # Show tooltip feedback
             QToolTip.showText(cb.mapToGlobal(cb.rect().center()), "Copied!", cb)
             QTimer.singleShot(1000, QToolTip.hideText)
 
     def log_message(self, text):
-        print(text)  # optional console log
+        print(text)
 
     def uid_to_string(self, uid):
         return ''.join(format(i, '02X') for i in uid)
@@ -139,9 +134,9 @@ class MFRC522Plugin(QWidget):
             if i < len(page_cards):
                 cb.setText(page_cards[i])
                 if page_cards[i] == highlight_uid:
-                    cb.setStyleSheet("color: green; font-weight: bold; font-size: 10px;")
+                    cb.setStyleSheet("color: green; font-weight: bold; font-size: 18px; padding: 10px;")
                 else:
-                    cb.setStyleSheet("color: lightgrey; font-size: 10px;")
+                    cb.setStyleSheet("color: lightgrey; font-size: 18px; padding: 10px;")
                 cb.setChecked(False)
                 cb.setEnabled(True)
             else:
@@ -149,7 +144,6 @@ class MFRC522Plugin(QWidget):
                 cb.setChecked(False)
                 cb.setEnabled(False)
 
-        # Switch page if highlighted UID not visible
         if highlight_uid and highlight_uid not in page_cards:
             index = self.cards.index(highlight_uid)
             self.page = index // CARDS_PER_PAGE
