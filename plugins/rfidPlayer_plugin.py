@@ -53,7 +53,8 @@ class RfidPlayerPlugin(QWidget):
         # ---------------------- Data structures ----------------------
         self.video_map = {}
         self.load_videos()
-        self.current_uid = None
+        self.current_uid = None  # last scanned UID
+        self.playing_uid = None  # UID currently playing
         self.my_subprocess = None
 
         self.init_ui()
@@ -190,7 +191,7 @@ class RfidPlayerPlugin(QWidget):
             except Exception:
                 pass
         self.my_subprocess = None
-        time.sleep(0.1)  # small delay before starting next video
+        time.sleep(0.1)  # small delay
 
     def handle_video(self, uid_str):
         if uid_str not in self.video_map:
@@ -198,17 +199,20 @@ class RfidPlayerPlugin(QWidget):
         video_file = self.video_map[uid_str]
         if video_file.lower() == "stop":
             self.stop_current_video()
+            self.playing_uid = None
         else:
-            # play new video, stop previous
-            self.stop_current_video()
-            video_path = os.path.join(plugin_folder, video_file)
-            if os.path.exists(video_path):
-                self.my_subprocess = subprocess.Popen(
-                    ["/bin/ffplay", "-fs", "-autoexit", "-loop", "0", video_path],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True
-                )
+            # Only start if a different UID or no video is playing
+            if self.playing_uid != uid_str:
+                self.stop_current_video()
+                video_path = os.path.join(plugin_folder, video_file)
+                if os.path.exists(video_path):
+                    self.my_subprocess = subprocess.Popen(
+                        ["/bin/ffplay", "-fs", "-autoexit", "-loop", "0", video_path],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        start_new_session=True
+                    )
+                    self.playing_uid = uid_str
 
     # ---------------------- Logging & clipboard ----------------------
     def log_message(self, text):
