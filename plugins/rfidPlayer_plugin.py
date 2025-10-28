@@ -4,9 +4,10 @@ import sys
 import json
 import time
 import subprocess
+from datetime import datetime
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,
-    QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
+    QGridLayout, QApplication, QSpacerItem, QSizePolicy
 )
 from PyQt6.QtGui import QPixmap, QPalette, QBrush
 from PyQt6.QtCore import Qt, QTimer
@@ -139,6 +140,11 @@ class RfidPlayerPlugin(QWidget):
             self.grid_layout.addWidget(btn_save, i, 3)
             self.video_entries.append((le_uid, le_file))
 
+        # Last scanned label
+        self.last_scanned_label = QLabel("Last scanned: None")
+        self.last_scanned_label.setStyleSheet("color: lightgrey; font-size: 18px;")
+        main_layout.addWidget(self.last_scanned_label, alignment=Qt.AlignmentFlag.AlignCenter)
+
         # Spacer
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
@@ -163,6 +169,7 @@ class RfidPlayerPlugin(QWidget):
                 uid_str = ''.join(format(i, '02X') for i in uid)
                 if uid_str != self.current_uid:
                     self.current_uid = uid_str
+                    self.last_scanned_label.setText(f"Last scanned: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | UID: {uid_str}")
                     self.play_video_for_uid(uid_str)
 
     # ---------------------- Video playback ----------------------
@@ -180,4 +187,3 @@ class RfidPlayerPlugin(QWidget):
             if os.path.exists(filepath):
                 cmd = ["/bin/ffplay", "-fs", "-loop", "0", "-autoexit", filepath]
                 self.video_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
