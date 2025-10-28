@@ -4,11 +4,10 @@ import sys
 import json
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout,
-    QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip, QGraphicsOpacityEffect
+    QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
 )
-from PyQt6.QtGui import QPixmap, QPalette, QBrush
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation
-
+from PyQt6.QtGui import QPixmap, QPalette, QBrush, QFont
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
 
 # Ensure plugin folder is in sys.path
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
@@ -40,7 +39,7 @@ class MFRC522Plugin(QWidget):
         self.move(-50, 0)
         self.setWindowTitle("RFID Reader")
 
-        # ---------------------- Background image ----------------------
+        # ---------------------- Background ----------------------
         bg_path = os.path.join(plugin_folder, "background.png")
         if os.path.exists(bg_path):
             pixmap = QPixmap(bg_path).scaled(
@@ -77,14 +76,14 @@ class MFRC522Plugin(QWidget):
         self.anim_timer.timeout.connect(self.update_animation)
         self.anim_timer.start(ANIMATION_INTERVAL)
 
-        # ---------------------- Fade-in Animation ----------------------
-        self.opacity_effect = QGraphicsOpacityEffect(self)
-        self.setGraphicsEffect(self.opacity_effect)
-        self.fade_animation = QPropertyAnimation(self.opacity_effect, b"opacity")
-        self.fade_animation.setDuration(1200)
-        self.fade_animation.setStartValue(0)
-        self.fade_animation.setEndValue(1)
-        self.fade_animation.start()
+        # ---------------------- Fade-in animation ----------------------
+        self.grid_widget.setWindowOpacity(0.0)
+        self.fade_in_animation = QPropertyAnimation(self.grid_widget, b"windowOpacity")
+        self.fade_in_animation.setDuration(1500)  # 1.5s
+        self.fade_in_animation.setStartValue(0.0)
+        self.fade_in_animation.setEndValue(1.0)
+        self.fade_in_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
+        QTimer.singleShot(500, self.fade_in_animation.start)  # start after 0.5s
 
     # ---------------------- UI ----------------------
     def init_ui(self):
@@ -117,12 +116,13 @@ class MFRC522Plugin(QWidget):
 
         # Grid container with semi-transparent background
         self.grid_widget = QWidget()
+        self.grid_widget.setFixedSize(500, 320)  # static size
         self.grid_layout = QGridLayout()
         self.grid_widget.setLayout(self.grid_layout)
         self.grid_widget.setStyleSheet(
             "background-color: rgba(0,0,0,120); border-radius: 10px;"
         )
-        main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignHCenter)
+        main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Checkboxes
         for i in range(ROWS):
@@ -210,8 +210,8 @@ class MFRC522Plugin(QWidget):
         if highlight_uid and highlight_uid not in page_cards:
             self.goto_page_for_uid(highlight_uid)
 
+    # ---------------------- Animation ----------------------
     def update_animation(self):
-        """Handles green highlight fade-out effect on scanned cards."""
         for cb in self.checkboxes:
             uid = cb.text()
             if uid in self.animations and self.animations[uid] > 0:
@@ -252,11 +252,3 @@ class MFRC522Plugin(QWidget):
             except Exception as e:
                 self.log_message(f"Error loading cards: {e}")
                 self.cards = []
-
-
-# Standalone mode (for testing)
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    win = MFRC522Plugin()
-    win.show()
-    sys.exit(app.exec())
