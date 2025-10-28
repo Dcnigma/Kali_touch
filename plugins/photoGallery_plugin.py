@@ -56,7 +56,7 @@ class ImageEditorDialog(QDialog):
         self.shape_start = None
         self.shape_end = None
         self.drawing = False
-
+        
         self.text_color = (255, 255, 255, 255)
         self.fill_color = (0, 0, 0, 0)
         self.stroke_color = (255, 0, 0, 255)
@@ -69,7 +69,8 @@ class ImageEditorDialog(QDialog):
     def init_ui(self):
         v = QVBoxLayout()
         self.setLayout(v)
-        self.setWindowState(self.windowState() | Qt.WindowState.WindowFullScreen)
+        self.setFixedSize(WINDOW_WIDTH, WINDOW_HEIGHT)
+        self.setWindowState(self.windowState() | Qt.WindowState.WindowFixedSize)
 
         # --- Image display ---
         self.image_label = QLabel(self)
