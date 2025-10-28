@@ -21,7 +21,7 @@ try:
 except ImportError:
     LIB_AVAILABLE = False
 
-CARDS_PER_PAGE = 8  # 2 columns x 8 rows
+CARDS_PER_PAGE = 8  # 2 columns x 4 rows
 COLUMNS = 2
 ROWS = 4
 ANIMATION_STEPS = 10
@@ -34,30 +34,49 @@ class MFRC522Plugin(QWidget):
         super().__init__(parent)
         self.cfg = cfg
 
-        # Window size and position
-        self.setFixedSize(1015, 570)
+        # ---------------------- Window setup ----------------------
+        self.setFixedSize(1015, 570)  # Window size
         self.move(-50, 0)
         self.setWindowTitle("RFID Reader")
 
+        # ---------------------- Background image ----------------------
+        bg_path = os.path.join(plugin_folder, "background.png")
+        if os.path.exists(bg_path):
+            self.setStyleSheet(f"""
+                QWidget {{
+                    background-image: url("{bg_path}");
+                    background-repeat: no-repeat;
+                    background-position: center;
+                    background-size: cover;
+                }}
+            """)
+
+        # ---------------------- Internal state ----------------------
         self.cards = []
         self.page = 0
         self.checkboxes = []
         self.animations = {}  # uid -> current animation step
 
+        # Load saved cards
         self.load_cards()
+
+        # ---------------------- UI ----------------------
         self.init_ui()
 
+        # ---------------------- MFRC522 ----------------------
         if LIB_AVAILABLE:
             self.reader = MFRC522.MFRC522()
         else:
-            self.log_message("MFRC522 Python library not available on this system.\nPlace MFRC522.py in the same folder as this plugin to read cards.")
+            self.log_message(
+                "MFRC522 Python library not available on this system.\n"
+                "Place MFRC522.py in the same folder as this plugin to read cards."
+            )
 
-        # Timer to poll cards
+        # ---------------------- Timers ----------------------
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_card)
         self.timer.start(500)
 
-        # Animation timer
         self.anim_timer = QTimer()
         self.anim_timer.timeout.connect(self.update_animation)
         self.anim_timer.start(ANIMATION_INTERVAL)
@@ -66,11 +85,13 @@ class MFRC522Plugin(QWidget):
     def init_ui(self):
         main_layout = QVBoxLayout()
         self.setLayout(main_layout)
-        # Spacer between logo and grid
-        spacer = QWidget()
-        spacer.setFixedHeight(20)  # 20 pixels of space
-        main_layout.addWidget(spacer)
-        # Logo top-left
+
+        # Spacer for top padding
+        spacer_top = QWidget()
+        spacer_top.setFixedHeight(10)
+        main_layout.addWidget(spacer_top)
+
+        # Logo top-center
         self.logo_label = QLabel(self)
         logo_path = os.path.join(plugin_folder, "logo.png")
         if os.path.exists(logo_path):
@@ -79,16 +100,16 @@ class MFRC522Plugin(QWidget):
             self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
         main_layout.addWidget(self.logo_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Spacer between logo and grid
-        spacer = QWidget()
-        spacer.setFixedHeight(20)  # 20 pixels of space
-        main_layout.addWidget(spacer)
-        
-        # Grid container
+        # Spacer under logo
+        spacer_logo = QWidget()
+        spacer_logo.setFixedHeight(10)
+        main_layout.addWidget(spacer_logo)
+
+        # Grid container with semi-transparent background
         self.grid_widget = QWidget()
         self.grid_layout = QGridLayout()
         self.grid_widget.setLayout(self.grid_layout)
-        self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,50); border-radius: 10px;")
+        self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,120); border-radius: 10px;")
         main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         # Checkboxes
@@ -112,9 +133,11 @@ class MFRC522Plugin(QWidget):
         pagination_layout.addWidget(self.next_button)
         main_layout.addLayout(pagination_layout)
 
+        # Spacer at bottom
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
-        self.update_checkboxes()  # show saved cards
+        # Show saved cards
+        self.update_checkboxes()
 
     # ---------------------- Checkbox click ----------------------
     def checkbox_clicked(self):
@@ -184,10 +207,10 @@ class MFRC522Plugin(QWidget):
             if uid in self.animations and self.animations[uid] > 0:
                 step = self.animations[uid]
                 green_value = int(255 * step / ANIMATION_STEPS)
-                cb.setStyleSheet(f"color: rgb(0,{green_value},0); font-size: 20px; padding: 15px;")
+                cb.setStyleSheet(f"color: rgb(0,{green_value},0); font-size: 22px; padding: 20px;")
                 self.animations[uid] -= 1
             elif uid in self.animations and self.animations[uid] <= 0:
-                cb.setStyleSheet("color: lightgrey; font-size: 20px; padding: 15px;")
+                cb.setStyleSheet("color: lightgrey; font-size: 22px; padding: 20px;")
                 del self.animations[uid]
 
     # ---------------------- Pagination buttons ----------------------
