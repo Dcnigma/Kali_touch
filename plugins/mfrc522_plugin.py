@@ -2,11 +2,12 @@
 import os
 import sys
 import json
+from datetime import datetime
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout,
     QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
 )
-from PyQt6.QtGui import QPixmap, QPalette, QBrush, QFont
+from PyQt6.QtGui import QPixmap, QPalette, QBrush
 from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
 
 # Ensure plugin folder is in sys.path
@@ -55,6 +56,7 @@ class MFRC522Plugin(QWidget):
         self.page = 0
         self.checkboxes = []
         self.animations = {}
+        self.last_scan = None
 
         self.load_cards()
         self.init_ui()
@@ -83,7 +85,10 @@ class MFRC522Plugin(QWidget):
         self.fade_in_animation.setStartValue(0.0)
         self.fade_in_animation.setEndValue(1.0)
         self.fade_in_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
-        QTimer.singleShot(500, self.fade_in_animation.start)  # start after 0.5s
+        QTimer.singleShot(500, self.fade_in_animation.start)
+
+        # Update last scan label on startup
+        self.update_last_scan_label()
 
     # ---------------------- UI ----------------------
     def init_ui(self):
@@ -145,8 +150,15 @@ class MFRC522Plugin(QWidget):
         pagination_layout.addWidget(self.next_button)
         main_layout.addLayout(pagination_layout)
 
+        # Last scan label below buttons
+        self.last_scan_label = QLabel("", self)
+        self.last_scan_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.last_scan_label.setStyleSheet("color: lightgrey; font-size: 16px;")
+        main_layout.addWidget(self.last_scan_label)
+
         # Spacer at bottom
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+
         self.update_checkboxes()
 
     # ---------------------- Checkbox click ----------------------
@@ -175,11 +187,15 @@ class MFRC522Plugin(QWidget):
             status, uid = self.reader.MFRC522_SelectTagSN()
             if status == self.reader.MI_OK:
                 uid_str = self.uid_to_string(uid)
+                now_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 if uid_str not in self.cards:
                     self.cards.append(uid_str)
-                    self.save_cards()
+                # Save last scan
+                self.last_scan = {"uid": uid_str, "date": now_str}
+                self.save_cards()
                 self.animations[uid_str] = ANIMATION_STEPS
                 self.goto_page_for_uid(uid_str)
+                self.update_last_scan_label()
 
     # ---------------------- Pagination & display ----------------------
     def goto_page_for_uid(self, uid_str):
@@ -236,11 +252,24 @@ class MFRC522Plugin(QWidget):
         self.page = (self.page - 1 + total_pages) % total_pages
         self.update_checkboxes()
 
+    # ---------------------- Last scan label ----------------------
+    def update_last_scan_label(self):
+        if self.last_scan:
+            self.last_scan_label.setText(
+                f"Last card scan: {self.last_scan['date']}  {self.last_scan['uid']}"
+            )
+        else:
+            self.last_scan_label.setText("No card scanned yet.")
+
     # ---------------------- Save/load cards ----------------------
     def save_cards(self):
         try:
+            data = {
+                "cards": self.cards,
+                "last_scan": self.last_scan
+            }
             with open(CARDS_FILE, "w") as f:
-                json.dump(self.cards, f)
+                json.dump(data, f)
         except Exception as e:
             self.log_message(f"Error saving cards: {e}")
 
@@ -248,7 +277,10 @@ class MFRC522Plugin(QWidget):
         if os.path.exists(CARDS_FILE):
             try:
                 with open(CARDS_FILE, "r") as f:
-                    self.cards = json.load(f)
+                    data = json.load(f)
+                    self.cards = data.get("cards", [])
+                    self.last_scan = data.get("last_scan", None)
             except Exception as e:
                 self.log_message(f"Error loading cards: {e}")
                 self.cards = []
+                self.last_scan = None
