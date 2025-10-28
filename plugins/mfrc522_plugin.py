@@ -73,8 +73,8 @@ class MFRC522Plugin(QWidget):
         if os.path.exists(logo_path):
             pixmap = QPixmap(logo_path).scaled(200, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             self.logo_label.setPixmap(pixmap)
-            self.logo_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        main_layout.addWidget(self.logo_label, alignment=Qt.AlignmentFlag.AlignLeft)
+            self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
+        main_layout.addWidget(self.logo_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Spacer between logo and grid
         spacer = QWidget()
