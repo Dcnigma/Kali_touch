@@ -33,7 +33,8 @@ class MFRC522Plugin(QWidget):
         super().__init__(parent)
         self.cfg = cfg
         self.setWindowTitle("RFID Reader")
-        self.setFixedSize(800, 1000)
+        self.setFixedSize(1200, 900)
+        self.setMinimumSize(1200, 900)
         self.cards = self.load_cards()  # Load stored UIDs
         self.page = 0
         self.checkboxes = []
