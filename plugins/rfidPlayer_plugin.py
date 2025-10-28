@@ -6,7 +6,7 @@ import time
 import subprocess
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,
-    QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
+    QGridLayout, QApplication, QSpacerItem, QSizePolicy
 )
 from PyQt6.QtGui import QPixmap, QPalette, QBrush
 from PyQt6.QtCore import Qt, QTimer
@@ -24,6 +24,9 @@ except ImportError:
     LIB_AVAILABLE = False
 
 VIDEO_FILE = os.path.join(plugin_folder, "videos.json")
+CARDS_PER_PAGE = 8  # for UI grid
+COLUMNS = 2
+ROWS = 4
 
 
 class RfidPlayerPlugin(QWidget):
@@ -59,8 +62,8 @@ class RfidPlayerPlugin(QWidget):
             self.reader = MFRC522.MFRC522()
         else:
             self.log_message(
-                "MFRC522 Python library not available on this system.\n"
-                "Place MFRC522.py in the same folder as this plugin to read cards."
+                "MFRC522 Python library not available.\n"
+                "Place MFRC522.py in the plugin folder."
             )
 
         # ---------------------- Timers ----------------------
@@ -173,36 +176,39 @@ class RfidPlayerPlugin(QWidget):
                 self.current_uid = uid_str
                 timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
                 self.last_scanned_label.setText(f"Last scanned: {timestamp} | UID: {uid_str}")
-                self.play_video_for_uid(uid_str)
+                self.handle_video(uid_str)
 
     def uid_to_string(self, uid):
         return ''.join(format(i, '02X') for i in uid)
 
     # ---------------------- Video playback ----------------------
     def stop_current_video(self):
-        try:
-            if self.my_subprocess:
+        if self.my_subprocess:
+            try:
                 self.my_subprocess.terminate()
-                self.my_subprocess.wait(timeout=0.5)
-        except Exception:
-            pass
+                self.my_subprocess.wait(timeout=1)
+            except Exception:
+                pass
         self.my_subprocess = None
+        time.sleep(0.1)  # small delay before starting next video
 
-    def play_video_for_uid(self, uid_str):
-        if uid_str in self.video_map:
-            video_file = self.video_map[uid_str]
-            if video_file.lower() == "stop":
-                self.stop_current_video()
-                return
+    def handle_video(self, uid_str):
+        if uid_str not in self.video_map:
+            return
+        video_file = self.video_map[uid_str]
+        if video_file.lower() == "stop":
+            self.stop_current_video()
+        else:
+            # play new video, stop previous
+            self.stop_current_video()
             video_path = os.path.join(plugin_folder, video_file)
             if os.path.exists(video_path):
-                # Stop any previous video first
-                self.stop_current_video()
-                # Loop continuously
-                cmd = ("/bin/ffplay", "-loop", "5","-fs", video_path)
-                self.my_subprocess = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                                                     stdout=subprocess.PIPE,
-                                                     stderr=subprocess.PIPE)
+                self.my_subprocess = subprocess.Popen(
+                    ["/bin/ffplay", "-fs", "-autoexit", "-loop", "0", video_path],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True
+                )
 
     # ---------------------- Logging & clipboard ----------------------
     def log_message(self, text):
