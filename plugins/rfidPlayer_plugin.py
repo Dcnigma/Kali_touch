@@ -4,10 +4,9 @@ import sys
 import json
 import time
 import subprocess
-from datetime import datetime
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,
-    QGridLayout, QApplication, QSpacerItem, QSizePolicy
+    QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
 )
 from PyQt6.QtGui import QPixmap, QPalette, QBrush
 from PyQt6.QtCore import Qt, QTimer
@@ -24,11 +23,10 @@ try:
 except ImportError:
     LIB_AVAILABLE = False
 
-VIDEOS_FILE = os.path.join(plugin_folder, "videos.json")
 CARDS_PER_PAGE = 8  # 2 columns x 4 rows
 COLUMNS = 2
 ROWS = 4
-CHECK_INTERVAL = 500  # ms
+VIDEO_FILE = os.path.join(plugin_folder, "videos.json")
 
 
 class RfidPlayerPlugin(QWidget):
@@ -36,7 +34,7 @@ class RfidPlayerPlugin(QWidget):
         super().__init__(parent)
         self.cfg = cfg
 
-        # ---------------------- Window ----------------------
+        # ---------------------- Window setup ----------------------
         self.setFixedSize(1015, 570)
         self.move(-50, 0)
         self.setWindowTitle("RFID Video Player")
@@ -52,56 +50,26 @@ class RfidPlayerPlugin(QWidget):
             self.setAutoFillBackground(True)
             self.setPalette(palette)
 
-        # ---------------------- Data ----------------------
+        # ---------------------- Data structures ----------------------
         self.video_map = {}
-        self.checkboxes = []
-        self.page = 0
-        self.current_uid = None
-        self.video_process = None
-
         self.load_videos()
+        self.current_uid = None
+        self.my_subprocess = None
+
         self.init_ui()
 
         if LIB_AVAILABLE:
             self.reader = MFRC522.MFRC522()
         else:
-            print("MFRC522 Python library not available. Plugin will not read cards.")
+            self.log_message(
+                "MFRC522 Python library not available on this system.\n"
+                "Place MFRC522.py in the same folder as this plugin to read cards."
+            )
 
         # ---------------------- Timers ----------------------
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_card)
-        self.timer.start(CHECK_INTERVAL)
-
-    # ---------------------- Load videos ----------------------
-    def load_videos(self):
-        if os.path.exists(VIDEOS_FILE):
-            try:
-                with open(VIDEOS_FILE, "r") as f:
-                    self.video_map = json.load(f)
-            except Exception as e:
-                print(f"Error loading videos.json: {e}")
-                self.video_map = {}
-        else:
-            # default videos
-            self.video_map = {
-                "C0E961C5": "Fingerprint.mp4",
-                "167B001E": "Password.mp4",
-                "F93264E6": "Skull.mp4",
-                "BEA65461": "stop"
-            }
-            # Save the default JSON
-            try:
-                with open(VIDEOS_FILE, "w") as f:
-                    json.dump(self.video_map, f, indent=4)
-            except Exception as e:
-                print(f"Error creating default videos.json: {e}")
-
-    def save_videos(self):
-        try:
-            with open(VIDEOS_FILE, "w") as f:
-                json.dump(self.video_map, f, indent=4)
-        except Exception as e:
-            print(f"Error saving videos.json: {e}")
+        self.timer.start(500)
 
     # ---------------------- UI ----------------------
     def init_ui(self):
@@ -109,81 +77,138 @@ class RfidPlayerPlugin(QWidget):
         self.setLayout(main_layout)
 
         # Logo
-        logo_label = QLabel(self)
+        self.logo_label = QLabel(self)
         logo_path = os.path.join(plugin_folder, "logo.png")
         if os.path.exists(logo_path):
-            pixmap = QPixmap(logo_path).scaled(200, 50, Qt.AspectRatioMode.KeepAspectRatio)
-            logo_label.setPixmap(pixmap)
-            logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(logo_label, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        # Grid for videos
-        self.grid_widget = QWidget()
-        self.grid_widget.setFixedSize(600, 320)
-        self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,120); border-radius: 10px;")
-        self.grid_layout = QGridLayout()
-        self.grid_widget.setLayout(self.grid_layout)
-        main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        # Video entries
-        self.video_entries = []
-        for i, (uid, filename) in enumerate(self.video_map.items()):
-            label = QLabel(uid)
-            label.setStyleSheet("color: lightgrey; font-size: 16px;")
-            le_uid = QLineEdit(uid)
-            le_file = QLineEdit(filename)
-            btn_save = QPushButton("Save")
-            btn_save.clicked.connect(lambda _, idx=i: self.update_video_entry(idx))
-            self.grid_layout.addWidget(label, i, 0)
-            self.grid_layout.addWidget(le_uid, i, 1)
-            self.grid_layout.addWidget(le_file, i, 2)
-            self.grid_layout.addWidget(btn_save, i, 3)
-            self.video_entries.append((le_uid, le_file))
-
-        # Last scanned label
-        self.last_scanned_label = QLabel("Last scanned: None")
-        self.last_scanned_label.setStyleSheet("color: lightgrey; font-size: 18px;")
-        main_layout.addWidget(self.last_scanned_label, alignment=Qt.AlignmentFlag.AlignCenter)
+            pixmap = QPixmap(logo_path).scaled(
+                200, 50, Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
+            self.logo_label.setPixmap(pixmap)
+            self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
+        main_layout.addWidget(self.logo_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         # Spacer
+        spacer_logo = QWidget()
+        spacer_logo.setFixedHeight(20)
+        main_layout.addWidget(spacer_logo)
+
+        # Grid for video mapping
+        self.grid_widget = QWidget()
+        self.grid_widget.setFixedSize(700, 300)
+        self.grid_layout = QGridLayout()
+        self.grid_widget.setLayout(self.grid_layout)
+        self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,120); border-radius: 10px;")
+        main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # Video mapping rows
+        self.uid_inputs = []
+        self.video_inputs = []
+        for i, (uid, video) in enumerate(self.video_map.items()):
+            uid_label = QLabel(f"UID {i+1}:")
+            uid_label.setStyleSheet("color: lightgrey; font-size: 18px;")
+            uid_input = QLineEdit(uid)
+            uid_input.setStyleSheet("font-size: 16px;")
+            video_input = QLineEdit(video)
+            video_input.setStyleSheet("font-size: 16px;")
+            self.grid_layout.addWidget(uid_label, i, 0)
+            self.grid_layout.addWidget(uid_input, i, 1)
+            self.grid_layout.addWidget(video_input, i, 2)
+            self.uid_inputs.append(uid_input)
+            self.video_inputs.append(video_input)
+
+        # Save button
+        self.save_button = QPushButton("Save")
+        self.save_button.clicked.connect(self.save_videos)
+        main_layout.addWidget(self.save_button, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # Last scanned UID label
+        self.last_scanned_label = QLabel("Last scanned: None")
+        self.last_scanned_label.setStyleSheet("color: lightgrey; font-size: 18px;")
+        self.last_scanned_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        self.last_scanned_label.mousePressEvent = self.copy_last_uid_to_clipboard
+        main_layout.addWidget(self.last_scanned_label, alignment=Qt.AlignmentFlag.AlignCenter)
+
+        # Spacer at bottom
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
-    def update_video_entry(self, index):
-        le_uid, le_file = self.video_entries[index]
-        old_uid = list(self.video_map.keys())[index]
-        new_uid = le_uid.text()
-        new_file = le_file.text()
-        if old_uid != new_uid:
-            self.video_map.pop(old_uid)
-        self.video_map[new_uid] = new_file
-        self.save_videos()
+    # ---------------------- Load/save ----------------------
+    def load_videos(self):
+        if os.path.exists(VIDEO_FILE):
+            try:
+                with open(VIDEO_FILE, "r") as f:
+                    self.video_map = json.load(f)
+            except Exception as e:
+                print(f"Error loading video map: {e}")
+                self.video_map = {}
+        else:
+            # default example
+            self.video_map = {
+                "C0E961C5": "Fingerprint.mp4",
+                "167B001E": "Password.mp4",
+                "F93264E6": "Skull.mp4",
+                "BEA65461": "stop"
+            }
+            self.save_videos()
+
+    def save_videos(self):
+        self.video_map = {}
+        for uid_input, video_input in zip(self.uid_inputs, self.video_inputs):
+            uid = uid_input.text().strip()
+            video = video_input.text().strip()
+            if uid and video:
+                self.video_map[uid] = video
+        try:
+            with open(VIDEO_FILE, "w") as f:
+                json.dump(self.video_map, f)
+        except Exception as e:
+            self.log_message(f"Error saving video map: {e}")
 
     # ---------------------- Card reading ----------------------
     def check_card(self):
         if not LIB_AVAILABLE:
             return
-        status, _ = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
+        status, tag_type = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
         if status == self.reader.MI_OK:
             status, uid = self.reader.MFRC522_SelectTagSN()
             if status == self.reader.MI_OK:
-                uid_str = ''.join(format(i, '02X') for i in uid)
-                if uid_str != self.current_uid:
-                    self.current_uid = uid_str
-                    self.last_scanned_label.setText(f"Last scanned: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} | UID: {uid_str}")
-                    self.play_video_for_uid(uid_str)
+                uid_str = self.uid_to_string(uid)
+                self.current_uid = uid_str
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                self.last_scanned_label.setText(f"Last scanned: {timestamp} | UID: {uid_str}")
+                self.play_video_for_uid(uid_str)
+
+    def uid_to_string(self, uid):
+        return ''.join(format(i, '02X') for i in uid)
 
     # ---------------------- Video playback ----------------------
-    def play_video_for_uid(self, uid):
-        if self.video_process:
-            self.video_process.terminate()
-            self.video_process = None
-            time.sleep(0.2)
+    def stop_current_video(self):
+        try:
+            if self.my_subprocess:
+                self.my_subprocess.terminate()
+        except Exception:
+            pass
+        time.sleep(0.2)
+        self.my_subprocess = None
 
-        if uid in self.video_map:
-            filename = self.video_map[uid]
-            if filename.lower() == "stop":
+    def play_video_for_uid(self, uid_str):
+        if uid_str in self.video_map:
+            video_file = self.video_map[uid_str]
+            if video_file.lower() == "stop":
+                self.stop_current_video()
                 return
-            filepath = os.path.join(plugin_folder, filename)
-            if os.path.exists(filepath):
-                cmd = ["/bin/ffplay", "-fs", "-loop", "0", "-autoexit", filepath]
-                self.video_process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            self.stop_current_video()
+            video_path = os.path.join(plugin_folder, video_file)
+            if os.path.exists(video_path):
+                cmd = ("/bin/ffplay", "-fs", "-autoexit", "-loop", "0", video_path)
+                self.my_subprocess = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                                     stdout=subprocess.PIPE,
+                                                     stderr=subprocess.PIPE)
+
+    # ---------------------- Logging & clipboard ----------------------
+    def log_message(self, text):
+        print(text)
+
+    def copy_last_uid_to_clipboard(self, event):
+        if self.current_uid:
+            QApplication.clipboard().setText(self.current_uid)
