@@ -35,7 +35,7 @@ from PIL import Image, ImageOps, ImageQt, ImageDraw, ImageFont
 
 # Plugin folder and hardcoded photo folder
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
-PHOTO_FOLDER = os.path.join(plugin_folder, "~/Pictures/SavedPictures")
+PHOTO_FOLDER = os.path.join(plugin_folder, "/home/kali/Pictures/SavedPictures")
 
 THUMBNAIL_SIZE = (180, 120)  # width, height
 WINDOW_WIDTH = 1015
