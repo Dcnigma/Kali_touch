@@ -1,23 +1,5 @@
 #!/usr/bin/env python3
-"""
-photoGallery_plugin.py
-Touch-friendly photo gallery + editor with movable editable layers (text & shapes).
 
-Features implemented per user's requests:
-- Hardcoded PHOTO_FOLDER (user requested exact join form)
-- Scrollable thumbnail grid with swipe/drag scrolling
-- Fullscreen-like editor (doesn't force window state) with:
-  - Floating "← Back to Gallery" button (top-left, always visible)
-  - Bottom toolbar with editing buttons that auto-hide after 4s inactivity (instant show/hide)
-  - Movable/editable layer system:
-      * Text layers: add, move, edit content/font/size/color
-      * Shape layers: rectangle/ellipse/line, move, edit fill/stroke/thickness
-  - Save (overwrite) and Save as New (automatic unique filename)
-- Save bakes all layers onto the image and refreshes gallery
-- Lightweight, Pi-friendly (no heavy animations)
-
-Requires: PyQt6, Pillow
-"""
 import os
 import sys
 import uuid
