@@ -70,7 +70,7 @@ class ImageEditorDialog(QDialog):
         v = QVBoxLayout()
         self.setLayout(v)
         self.setFixedSize(WINDOW_WIDTH, WINDOW_HEIGHT)
-        self.setWindowState(self.windowState() | Qt.WindowState.WindowFixedSize)
+     #   self.setWindowState(self.windowState() | Qt.WindowState.WindowFixedSize)
 
         # --- Image display ---
         self.image_label = QLabel(self)
