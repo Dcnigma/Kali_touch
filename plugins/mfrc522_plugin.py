@@ -6,8 +6,9 @@ from PyQt6.QtWidgets import (
     QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout,
     QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
 )
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QPixmap, QPalette, QBrush
 from PyQt6.QtCore import Qt, QTimer
+
 
 # Ensure plugin folder is in sys.path
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
@@ -35,26 +36,26 @@ class MFRC522Plugin(QWidget):
         self.cfg = cfg
 
         # ---------------------- Window setup ----------------------
-        self.setFixedSize(1015, 570)  # Window size
+        self.setFixedSize(1015, 570)
         self.move(-50, 0)
         self.setWindowTitle("RFID Reader")
 
         # ---------------------- Background image ----------------------
         bg_path = os.path.join(plugin_folder, "background.png")
         if os.path.exists(bg_path):
-            self.setStyleSheet(f"""
-                MFRC522Plugin {{
-                    background-image: url("{bg_path}");
-                    background-repeat: no-repeat;
-                    background-position: center;
-                    background-size: cover;
-                }}
-            """)
+            pixmap = QPixmap(bg_path).scaled(
+                self.size(), Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation
+            )
+            palette = self.palette()
+            palette.setBrush(QPalette.ColorRole.Window, QBrush(pixmap))
+            self.setAutoFillBackground(True)
+            self.setPalette(palette)
 
+        # ---------------------- Data structures ----------------------
         self.cards = []
         self.page = 0
         self.checkboxes = []
-        self.animations = {}  # uid -> current animation step
+        self.animations = {}
 
         self.load_cards()
         self.init_ui()
@@ -67,12 +68,11 @@ class MFRC522Plugin(QWidget):
                 "Place MFRC522.py in the same folder as this plugin to read cards."
             )
 
-        # Timer to poll cards
+        # ---------------------- Timers ----------------------
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_card)
         self.timer.start(500)
 
-        # Animation timer
         self.anim_timer = QTimer()
         self.anim_timer.timeout.connect(self.update_animation)
         self.anim_timer.start(ANIMATION_INTERVAL)
@@ -106,11 +106,10 @@ class MFRC522Plugin(QWidget):
         spacer_logo.setFixedHeight(20)
         main_layout.addWidget(spacer_logo)
 
-        # Grid container
+        # Grid container with semi-transparent background
         self.grid_widget = QWidget()
         self.grid_layout = QGridLayout()
         self.grid_widget.setLayout(self.grid_layout)
-        # Semi-transparent dark background
         self.grid_widget.setStyleSheet(
             "background-color: rgba(0,0,0,120); border-radius: 10px;"
         )
@@ -137,10 +136,9 @@ class MFRC522Plugin(QWidget):
         pagination_layout.addWidget(self.next_button)
         main_layout.addLayout(pagination_layout)
 
-        # Expanding spacer at bottom
+        # Spacer at bottom
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
-        self.update_checkboxes()  # show saved cards
+        self.update_checkboxes()
 
     # ---------------------- Checkbox click ----------------------
     def checkbox_clicked(self):
@@ -172,7 +170,6 @@ class MFRC522Plugin(QWidget):
                     self.cards.append(uid_str)
                     self.save_cards()
                 self.animations[uid_str] = ANIMATION_STEPS
-                # Auto-switch to correct page if needed
                 self.goto_page_for_uid(uid_str)
 
     # ---------------------- Pagination & display ----------------------
@@ -205,7 +202,7 @@ class MFRC522Plugin(QWidget):
             self.goto_page_for_uid(highlight_uid)
 
     def update_animation(self):
-        for i, cb in enumerate(self.checkboxes):
+        for cb in self.checkboxes:
             uid = cb.text()
             if uid in self.animations and self.animations[uid] > 0:
                 step = self.animations[uid]
@@ -218,7 +215,7 @@ class MFRC522Plugin(QWidget):
                 cb.setStyleSheet("color: lightgrey; font-size: 22px; padding: 20px;")
                 del self.animations[uid]
 
-    # ---------------------- Pagination buttons ----------------------
+    # ---------------------- Pagination ----------------------
     def next_page(self):
         total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
         self.page = (self.page + 1) % total_pages
