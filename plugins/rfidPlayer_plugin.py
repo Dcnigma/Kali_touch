@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+    #!/usr/bin/env python3
 import os
 import sys
 import json
@@ -200,8 +200,8 @@ class RFIDVideoPlugin(QWidget):
         else:
             # default example
             self.video_map = {
-                "C561E9C0": "Fingerprint.mp4",
-                "1E007B16": "Password.mp4",
-                "1E00307C": "Skull.mp4",
-                "6154A6BE": "stop"
+                "C0E961C5": "Fingerprint.mp4",
+                "167B001E": "Password.mp4",
+                "F93264E6": "Skull.mp4",
+                "BEA65461": "stop"
             }
