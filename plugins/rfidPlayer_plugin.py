@@ -199,7 +199,7 @@ class RfidPlayerPlugin(QWidget):
                 # Stop any previous video first
                 self.stop_current_video()
                 # Loop continuously
-                cmd = ("/bin/ffplay", "-fs", "-autoexit", "-loop", "0", video_path)
+                cmd = ("/bin/ffplay", "-fs", "-loop", "0", video_path)
                 self.my_subprocess = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                                                      stdout=subprocess.PIPE,
                                                      stderr=subprocess.PIPE)
