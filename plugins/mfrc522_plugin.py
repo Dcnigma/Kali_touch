@@ -43,7 +43,7 @@ class MFRC522Plugin(QWidget):
         bg_path = os.path.join(plugin_folder, "background.png")
         if os.path.exists(bg_path):
             self.setStyleSheet(f"""
-                QWidget {{
+                MFRC522Plugin {{
                     background-image: url("{bg_path}");
                     background-repeat: no-repeat;
                     background-position: center;
@@ -51,19 +51,14 @@ class MFRC522Plugin(QWidget):
                 }}
             """)
 
-        # ---------------------- Internal state ----------------------
         self.cards = []
         self.page = 0
         self.checkboxes = []
         self.animations = {}  # uid -> current animation step
 
-        # Load saved cards
         self.load_cards()
-
-        # ---------------------- UI ----------------------
         self.init_ui()
 
-        # ---------------------- MFRC522 ----------------------
         if LIB_AVAILABLE:
             self.reader = MFRC522.MFRC522()
         else:
@@ -72,11 +67,12 @@ class MFRC522Plugin(QWidget):
                 "Place MFRC522.py in the same folder as this plugin to read cards."
             )
 
-        # ---------------------- Timers ----------------------
+        # Timer to poll cards
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_card)
         self.timer.start(500)
 
+        # Animation timer
         self.anim_timer = QTimer()
         self.anim_timer.timeout.connect(self.update_animation)
         self.anim_timer.start(ANIMATION_INTERVAL)
@@ -86,7 +82,7 @@ class MFRC522Plugin(QWidget):
         main_layout = QVBoxLayout()
         self.setLayout(main_layout)
 
-        # Spacer for top padding
+        # Spacer above logo
         spacer_top = QWidget()
         spacer_top.setFixedHeight(10)
         main_layout.addWidget(spacer_top)
@@ -95,21 +91,29 @@ class MFRC522Plugin(QWidget):
         self.logo_label = QLabel(self)
         logo_path = os.path.join(plugin_folder, "logo.png")
         if os.path.exists(logo_path):
-            pixmap = QPixmap(logo_path).scaled(200, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            pixmap = QPixmap(logo_path).scaled(
+                200, 50, Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation
+            )
             self.logo_label.setPixmap(pixmap)
-            self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
+            self.logo_label.setAlignment(
+                Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop
+            )
         main_layout.addWidget(self.logo_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Spacer under logo
+        # Spacer between logo and grid
         spacer_logo = QWidget()
-        spacer_logo.setFixedHeight(10)
+        spacer_logo.setFixedHeight(20)
         main_layout.addWidget(spacer_logo)
 
-        # Grid container with semi-transparent background
+        # Grid container
         self.grid_widget = QWidget()
         self.grid_layout = QGridLayout()
         self.grid_widget.setLayout(self.grid_layout)
-        self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,120); border-radius: 10px;")
+        # Semi-transparent dark background
+        self.grid_widget.setStyleSheet(
+            "background-color: rgba(0,0,0,120); border-radius: 10px;"
+        )
         main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         # Checkboxes
@@ -133,11 +137,10 @@ class MFRC522Plugin(QWidget):
         pagination_layout.addWidget(self.next_button)
         main_layout.addLayout(pagination_layout)
 
-        # Spacer at bottom
+        # Expanding spacer at bottom
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
-        # Show saved cards
-        self.update_checkboxes()
+        self.update_checkboxes()  # show saved cards
 
     # ---------------------- Checkbox click ----------------------
     def checkbox_clicked(self):
@@ -207,7 +210,9 @@ class MFRC522Plugin(QWidget):
             if uid in self.animations and self.animations[uid] > 0:
                 step = self.animations[uid]
                 green_value = int(255 * step / ANIMATION_STEPS)
-                cb.setStyleSheet(f"color: rgb(0,{green_value},0); font-size: 22px; padding: 20px;")
+                cb.setStyleSheet(
+                    f"color: rgb(0,{green_value},0); font-size: 22px; padding: 20px;"
+                )
                 self.animations[uid] -= 1
             elif uid in self.animations and self.animations[uid] <= 0:
                 cb.setStyleSheet("color: lightgrey; font-size: 22px; padding: 20px;")
