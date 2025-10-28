@@ -369,7 +369,7 @@ class ImageEditorDialog(QDialog):
         self.delete_btn.hide()
         self.update_display()
     
-   def _get_layer(self, lid):
+    def _get_layer(self, lid):
         for L in self.layers:
             if L['id'] == lid:
                 return L
