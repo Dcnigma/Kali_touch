@@ -133,16 +133,19 @@ class ImageEditorDialog(QDialog):
         b_place.clicked.connect(self.start_place_shape)
         toolbar_layout.addWidget(b_place)
 
-        # --- Save / Close ---
-        toolbar_layout.addSpacing(10)
-        for text, fn in [
-            ("Save (overwrite)", self.save_overwrite),
-            ("Save As New", self.save_as_new),
-            ("Close", self.close),
-        ]:
-            b = QPushButton(text)
-            b.clicked.connect(fn)
-            toolbar_layout.addWidget(b)
+        # --- Save / Back buttons (always visible) ---
+        toolbar_layout.addSpacing(20)
+        save_btn = QPushButton("💾 Save (overwrite)")
+        save_btn.clicked.connect(self.save_overwrite)
+        toolbar_layout.addWidget(save_btn)
+
+        save_new_btn = QPushButton("🆕 Save as New")
+        save_new_btn.clicked.connect(self.save_as_new)
+        toolbar_layout.addWidget(save_new_btn)
+
+        back_btn = QPushButton("⬅ Back to Gallery")
+        back_btn.clicked.connect(self.close)
+        toolbar_layout.addWidget(back_btn)
 
         # --- Mouse drawing ---
         self.image_label.mousePressEvent = self._mouse_press
@@ -264,8 +267,8 @@ class ImageEditorDialog(QDialog):
     def save_overwrite(self):
         try:
             self.working.convert("RGB").save(self.image_path)
-            QMessageBox.information(self, "Saved", f"Saved: {self.image_path}")
-            if self.on_saved_callback: self.on_saved_callback()
+            if self.on_saved_callback:
+                self.on_saved_callback()
         except Exception as e:
             QMessageBox.warning(self, "Save failed", str(e))
 
@@ -276,8 +279,8 @@ class ImageEditorDialog(QDialog):
             fpath = os.path.join(PHOTO_FOLDER, fname)
             os.makedirs(PHOTO_FOLDER, exist_ok=True)
             self.working.convert("RGB").save(fpath)
-            QMessageBox.information(self, "Saved As New", f"Saved new file: {fpath}")
-            if self.on_saved_callback: self.on_saved_callback()
+            if self.on_saved_callback:
+                self.on_saved_callback()
         except Exception as e:
             QMessageBox.warning(self, "Save failed", str(e))
 
@@ -301,7 +304,6 @@ class PhotoGalleryPlugin(QWidget):
         main_layout = QVBoxLayout()
         self.setLayout(main_layout)
 
-        # --- Scroll area for thumbnails ---
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         scroll_content = QWidget()
@@ -309,12 +311,10 @@ class PhotoGalleryPlugin(QWidget):
         self.scroll.setWidget(scroll_content)
         main_layout.addWidget(self.scroll)
 
-        # Enable swipe/drag scroll
         self.scroll.viewport().setAttribute(Qt.WidgetAttribute.WA_AcceptTouchEvents, True)
         self.scroll.grabGesture(Qt.GestureType.PanGesture)
         self.scroll.event = self._touch_scroll_event
 
-        # --- Bottom buttons ---
         btn_layout = QHBoxLayout()
         for text, fn in [
             ("Refresh", self.load_thumbnails),
@@ -326,7 +326,6 @@ class PhotoGalleryPlugin(QWidget):
             btn_layout.addWidget(b)
         main_layout.addLayout(btn_layout)
 
-    # --- Swipe scrolling handler ---
     def _touch_scroll_event(self, event):
         if event.type() == event.Type.Gesture:
             gesture = event.gesture(Qt.GestureType.PanGesture)
@@ -336,7 +335,6 @@ class PhotoGalleryPlugin(QWidget):
                 return True
         return super().event(event)
 
-    # --- Thumbnails ---
     def load_thumbnails(self):
         while self.grid.count():
             item = self.grid.takeAt(0)
@@ -376,12 +374,10 @@ class PhotoGalleryPlugin(QWidget):
             if c >= 4:
                 c, r = 0, r + 1
 
-    # --- Image editor ---
     def open_editor(self, image_path):
         dlg = ImageEditorDialog(image_path, parent=self, on_saved_callback=self.load_thumbnails)
         dlg.exec()
 
-    # --- Import / open folder ---
     def import_image(self):
         fpath, _ = QFileDialog.getOpenFileName(self, "Import Image", "", "Images (*.png *.jpg *.jpeg *.bmp *.gif)")
         if not fpath:
@@ -392,7 +388,6 @@ class PhotoGalleryPlugin(QWidget):
             dst = os.path.join(PHOTO_FOLDER, fname)
             with open(fpath, "rb") as fr, open(dst, "wb") as fw:
                 fw.write(fr.read())
-            QMessageBox.information(self, "Imported", f"Imported to {dst}")
             self.load_thumbnails()
         except Exception as e:
             QMessageBox.warning(self, "Import failed", str(e))
@@ -409,7 +404,6 @@ class PhotoGalleryPlugin(QWidget):
             QMessageBox.warning(self, "Open folder failed", str(e))
 
 
-# --- For standalone testing ---
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     w = PhotoGalleryPlugin()
