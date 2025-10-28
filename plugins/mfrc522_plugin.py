@@ -76,6 +76,11 @@ class MFRC522Plugin(QWidget):
             self.logo_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         main_layout.addWidget(self.logo_label, alignment=Qt.AlignmentFlag.AlignLeft)
 
+        # Spacer between logo and grid
+        spacer = QWidget()
+        spacer.setFixedHeight(20)  # 20 pixels of space
+        main_layout.addWidget(spacer)
+        
         # Grid container
         self.grid_widget = QWidget()
         self.grid_layout = QGridLayout()
