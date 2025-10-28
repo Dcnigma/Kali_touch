@@ -294,7 +294,23 @@ class ImageEditorDialog(QDialog):
         fy = info['pix_h'] / img_h if img_h else 1.0
         dx = int(x * fx) + info['off_x']; dy = int(y * fy) + info['off_y']
         return QPoint(dx, dy)
+       
+    # ---------------- Color pickers ----------------
+    def choose_text_color(self):
+        c = QColorDialog.getColor()
+        if c.isValid():
+            self.default_text_color = (c.red(), c.green(), c.blue(), c.alpha())
 
+    def choose_fill_color(self):
+        c = QColorDialog.getColor()
+        if c.isValid():
+            self.default_fill = (c.red(), c.green(), c.blue(), c.alpha())
+
+    def choose_stroke_color(self):
+        c = QColorDialog.getColor()
+        if c.isValid():
+            self.default_stroke = (c.red(), c.green(), c.blue(), c.alpha())
+   
     # ---------------- Layers ----------------
     def add_text_layer(self):
         text = self.text_input.text().strip()
