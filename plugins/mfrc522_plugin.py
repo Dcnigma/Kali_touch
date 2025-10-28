@@ -21,9 +21,9 @@ try:
 except ImportError:
     LIB_AVAILABLE = False
 
-CARDS_PER_PAGE = 16  # 2 columns x 8 rows
+CARDS_PER_PAGE = 8  # 2 columns x 8 rows
 COLUMNS = 2
-ROWS = 8
+ROWS = 4
 ANIMATION_STEPS = 10
 ANIMATION_INTERVAL = 50  # ms
 CARDS_FILE = os.path.join(plugin_folder, "cards.json")
@@ -87,7 +87,7 @@ class MFRC522Plugin(QWidget):
         for i in range(ROWS):
             for j in range(COLUMNS):
                 cb = QCheckBox("")
-                cb.setStyleSheet("color: lightgrey; font-size: 20px; padding: 15px;")
+                cb.setStyleSheet("color: lightgrey; font-size: 22px; padding: 20px;")
                 cb.stateChanged.connect(self.checkbox_clicked)
                 self.grid_layout.addWidget(cb, i, j)
                 self.checkboxes.append(cb)
