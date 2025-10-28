@@ -39,7 +39,7 @@ PHOTO_FOLDER = os.path.join(plugin_folder, "/home/kali/Pictures/SavedPictures")
 
 THUMBNAIL_SIZE = (180, 120)  # width, height
 WINDOW_WIDTH = 1015
-WINDOW_HEIGHT = 500
+WINDOW_HEIGHT = 550
 
 SUPPORTED_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".gif")
 
