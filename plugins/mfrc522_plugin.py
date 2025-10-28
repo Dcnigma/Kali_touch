@@ -3,9 +3,10 @@ import os
 import sys
 import json
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
+    QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout,
+    QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
 )
-from PyQt6.QtGui import QPixmap, QColor
+from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt, QTimer
 
 # Ensure plugin folder is in sys.path
@@ -34,17 +35,16 @@ class MFRC522Plugin(QWidget):
         self.cfg = cfg
 
         # Window size and position
-        self.setFixedSize(1000, 800)  # width 1000
-        self.move(0, 0)  # start at top-left
+        self.setFixedSize(1000, 800)
+        self.move(0, 0)
         self.setWindowTitle("RFID Reader")
 
         self.cards = []
         self.page = 0
         self.checkboxes = []
-        self.continue_reading = True
         self.animations = {}  # uid -> current animation step
 
-        self.load_cards()  # Load saved cards from JSON
+        self.load_cards()
         self.init_ui()
 
         if LIB_AVAILABLE:
@@ -71,7 +71,7 @@ class MFRC522Plugin(QWidget):
         self.logo_label = QLabel(self)
         logo_path = os.path.join(plugin_folder, "logo.png")
         if os.path.exists(logo_path):
-            pixmap = QPixmap(logo_path).scaled(300, 75, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            pixmap = QPixmap(logo_path).scaled(200, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             self.logo_label.setPixmap(pixmap)
             self.logo_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         main_layout.addWidget(self.logo_label, alignment=Qt.AlignmentFlag.AlignLeft)
@@ -83,22 +83,22 @@ class MFRC522Plugin(QWidget):
         self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,50); border-radius: 10px;")
         main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignHCenter)
 
-        # Make checkboxes larger
+        # Checkboxes
         for i in range(ROWS):
             for j in range(COLUMNS):
                 cb = QCheckBox("")
-                cb.setStyleSheet("color: lightgrey; font-size: 24px; padding: 20px;")
+                cb.setStyleSheet("color: lightgrey; font-size: 20px; padding: 15px;")
                 cb.stateChanged.connect(self.checkbox_clicked)
                 self.grid_layout.addWidget(cb, i, j)
                 self.checkboxes.append(cb)
 
-        # Pagination
+        # Pagination buttons
         pagination_layout = QHBoxLayout()
         self.prev_button = QPushButton("Previous")
-        self.prev_button.setFixedSize(120, 40)
+        self.prev_button.setFixedSize(100, 35)
         self.prev_button.clicked.connect(self.prev_page)
         self.next_button = QPushButton("Next")
-        self.next_button.setFixedSize(120, 40)
+        self.next_button.setFixedSize(100, 35)
         self.next_button.clicked.connect(self.next_page)
         pagination_layout.addWidget(self.prev_button)
         pagination_layout.addWidget(self.next_button)
@@ -106,9 +106,9 @@ class MFRC522Plugin(QWidget):
 
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
-        self.update_checkboxes()  # Show saved cards on load
+        self.update_checkboxes()  # show saved cards
 
-    # ---------------------- Checkbox ----------------------
+    # ---------------------- Checkbox click ----------------------
     def checkbox_clicked(self):
         cb = self.sender()
         if cb.text():
@@ -138,9 +138,17 @@ class MFRC522Plugin(QWidget):
                     self.cards.append(uid_str)
                     self.save_cards()
                 self.animations[uid_str] = ANIMATION_STEPS
-                self.update_checkboxes(uid_str)
+                # Auto-switch to correct page if needed
+                self.goto_page_for_uid(uid_str)
 
-    # ---------------------- Checkbox update ----------------------
+    # ---------------------- Pagination & display ----------------------
+    def goto_page_for_uid(self, uid_str):
+        index = self.cards.index(uid_str)
+        new_page = index // CARDS_PER_PAGE
+        if new_page != self.page:
+            self.page = new_page
+        self.update_checkboxes(uid_str)
+
     def update_checkboxes(self, highlight_uid=None):
         total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
         self.page = min(self.page, total_pages - 1)
@@ -160,24 +168,21 @@ class MFRC522Plugin(QWidget):
                 cb.setEnabled(False)
 
         if highlight_uid and highlight_uid not in page_cards:
-            index = self.cards.index(highlight_uid)
-            self.page = index // CARDS_PER_PAGE
-            self.update_checkboxes(highlight_uid)
+            self.goto_page_for_uid(highlight_uid)
 
-    # ---------------------- Animation ----------------------
     def update_animation(self):
         for i, cb in enumerate(self.checkboxes):
             uid = cb.text()
             if uid in self.animations and self.animations[uid] > 0:
                 step = self.animations[uid]
                 green_value = int(255 * step / ANIMATION_STEPS)
-                cb.setStyleSheet(f"color: rgb(0,{green_value},0); font-size: 24px; padding: 20px;")
+                cb.setStyleSheet(f"color: rgb(0,{green_value},0); font-size: 20px; padding: 15px;")
                 self.animations[uid] -= 1
             elif uid in self.animations and self.animations[uid] <= 0:
-                cb.setStyleSheet("color: lightgrey; font-size: 24px; padding: 20px;")
+                cb.setStyleSheet("color: lightgrey; font-size: 20px; padding: 15px;")
                 del self.animations[uid]
 
-    # ---------------------- Pagination ----------------------
+    # ---------------------- Pagination buttons ----------------------
     def next_page(self):
         total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
         self.page = (self.page + 1) % total_pages
@@ -188,7 +193,7 @@ class MFRC522Plugin(QWidget):
         self.page = (self.page - 1 + total_pages) % total_pages
         self.update_checkboxes()
 
-    # ---------------------- Save/Load ----------------------
+    # ---------------------- Save/load cards ----------------------
     def save_cards(self):
         try:
             with open(CARDS_FILE, "w") as f:
