@@ -21,9 +21,9 @@ try:
 except ImportError:
     LIB_AVAILABLE = False
 
-CARDS_PER_PAGE = 16  # 2 columns x 4 rows
+CARDS_PER_PAGE = 16  # 2 columns x 8 rows
 COLUMNS = 2
-ROWS = 4
+ROWS = 8
 ANIMATION_STEPS = 10
 ANIMATION_INTERVAL = 50  # ms
 CARDS_FILE = os.path.join(plugin_folder, "cards.json")  # file to store scanned UIDs
