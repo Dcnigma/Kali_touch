@@ -21,9 +21,9 @@ try:
 except ImportError:
     LIB_AVAILABLE = False
 
-CARDS_PER_PAGE = 16  # 2 columns x 8 rows
+CARDS_PER_PAGE = 16  # 2 columns x 4 rows
 COLUMNS = 2
-ROWS = 8
+ROWS = 4
 ANIMATION_STEPS = 10
 ANIMATION_INTERVAL = 50  # ms
 CARDS_FILE = os.path.join(plugin_folder, "cards.json")  # file to store scanned UIDs
@@ -119,7 +119,7 @@ class MFRC522Plugin(QWidget):
         pagination_layout.addWidget(self.next_button)
         main_layout.addLayout(pagination_layout)
 
-        main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+        main_layout.addItem(QSpacerItem(20, 80, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
     # --- Checkbox clicked ---
     def checkbox_clicked(self):
