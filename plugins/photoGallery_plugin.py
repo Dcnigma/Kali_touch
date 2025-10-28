@@ -1,20 +1,5 @@
 #!/usr/bin/env python3
-"""
-photoGallery_plugin.py
-Photo gallery plugin for your launcher.
 
-Features:
-- Hardcoded PHOTO_FOLDER inside plugin folder (auto-created)
-- Scrollable thumbnail grid
-- Click a thumbnail -> opens fullscreen editor (esc to exit)
-- Editor: Rotate (90°), Negative, Black & White, Add Text, Add Shape (rect/ellipse/line)
-- Text/shape options via a compact popup docked at bottom
-- Save (overwrite) and Save As New (timestamp + uuid)
-- Auto-refresh gallery after saving
-Requires: PyQt6, Pillow (PIL)
-
-Author: generated for Bart Hamblok
-"""
 import os
 import sys
 import uuid
