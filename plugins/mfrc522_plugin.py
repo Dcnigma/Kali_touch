@@ -7,9 +7,9 @@ from PyQt6.QtWidgets import (
     QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
 )
 from PyQt6.QtGui import QPixmap, QPalette, QBrush, QFont
-from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation, QEasingCurve
+from PyQt6.QtCore import Qt, QTimer
 
-# Ensure plugin folder is in sys.path
+# ---------------------- Plugin folder ----------------------
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
 if plugin_folder not in sys.path:
     sys.path.insert(0, plugin_folder)
@@ -21,6 +21,7 @@ try:
 except ImportError:
     LIB_AVAILABLE = False
 
+# ---------------------- Constants ----------------------
 CARDS_PER_PAGE = 8  # 2 columns x 4 rows
 COLUMNS = 2
 ROWS = 4
@@ -50,7 +51,7 @@ class MFRC522Plugin(QWidget):
             self.setAutoFillBackground(True)
             self.setPalette(palette)
 
-        # ---------------------- Data structures ----------------------
+        # ---------------------- Data ----------------------
         self.cards = []
         self.page = 0
         self.checkboxes = []
@@ -75,15 +76,6 @@ class MFRC522Plugin(QWidget):
         self.anim_timer = QTimer()
         self.anim_timer.timeout.connect(self.update_animation)
         self.anim_timer.start(ANIMATION_INTERVAL)
-
-        # ---------------------- Fade-in animation ----------------------
-        self.grid_widget.setWindowOpacity(0.0)
-        self.fade_in_animation = QPropertyAnimation(self.grid_widget, b"windowOpacity")
-        self.fade_in_animation.setDuration(1500)  # 1.5s
-        self.fade_in_animation.setStartValue(0.0)
-        self.fade_in_animation.setEndValue(1.0)
-        self.fade_in_animation.setEasingCurve(QEasingCurve.Type.InOutCubic)
-        QTimer.singleShot(500, self.fade_in_animation.start)  # start after 0.5s
 
     # ---------------------- UI ----------------------
     def init_ui(self):
@@ -114,15 +106,14 @@ class MFRC522Plugin(QWidget):
         spacer_logo.setFixedHeight(20)
         main_layout.addWidget(spacer_logo)
 
-        # Grid container with semi-transparent background
+        # Grid container
         self.grid_widget = QWidget()
-        self.grid_widget.setFixedSize(500, 320)  # static size
         self.grid_layout = QGridLayout()
         self.grid_widget.setLayout(self.grid_layout)
         self.grid_widget.setStyleSheet(
             "background-color: rgba(0,0,0,120); border-radius: 10px;"
         )
-        main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignCenter)
+        main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         # Checkboxes
         for i in range(ROWS):
@@ -133,20 +124,29 @@ class MFRC522Plugin(QWidget):
                 self.grid_layout.addWidget(cb, i, j)
                 self.checkboxes.append(cb)
 
-        # Pagination buttons
+        # ---------------------- Pagination ----------------------
         pagination_layout = QHBoxLayout()
         self.prev_button = QPushButton("Previous")
         self.prev_button.setFixedSize(100, 35)
         self.prev_button.clicked.connect(self.prev_page)
+        pagination_layout.addWidget(self.prev_button)
+
+        # Fancy page indicator
+        self.page_label = QLabel()
+        self.page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.page_label.setFont(QFont("Monospace", 14))
+        pagination_layout.addWidget(self.page_label)
+
         self.next_button = QPushButton("Next")
         self.next_button.setFixedSize(100, 35)
         self.next_button.clicked.connect(self.next_page)
-        pagination_layout.addWidget(self.prev_button)
         pagination_layout.addWidget(self.next_button)
         main_layout.addLayout(pagination_layout)
 
-        # Spacer at bottom
+        # Expanding spacer at bottom
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+
+        # Show saved cards
         self.update_checkboxes()
 
     # ---------------------- Checkbox click ----------------------
@@ -181,13 +181,20 @@ class MFRC522Plugin(QWidget):
                 self.animations[uid_str] = ANIMATION_STEPS
                 self.goto_page_for_uid(uid_str)
 
-    # ---------------------- Pagination & display ----------------------
+    # ---------------------- Pagination ----------------------
     def goto_page_for_uid(self, uid_str):
         index = self.cards.index(uid_str)
         new_page = index // CARDS_PER_PAGE
         if new_page != self.page:
             self.page = new_page
         self.update_checkboxes(uid_str)
+
+    def update_page_indicator(self):
+        total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
+        indicator = ""
+        for i in range(total_pages):
+            indicator += "⃝" if i == self.page else "𖣠"
+        self.page_label.setText(f"[{indicator}]")
 
     def update_checkboxes(self, highlight_uid=None):
         total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
@@ -207,6 +214,9 @@ class MFRC522Plugin(QWidget):
                 cb.setChecked(False)
                 cb.setEnabled(False)
 
+        # Update fancy page indicator
+        self.update_page_indicator()
+
         if highlight_uid and highlight_uid not in page_cards:
             self.goto_page_for_uid(highlight_uid)
 
@@ -225,7 +235,6 @@ class MFRC522Plugin(QWidget):
                 cb.setStyleSheet("color: lightgrey; font-size: 22px; padding: 20px;")
                 del self.animations[uid]
 
-    # ---------------------- Pagination ----------------------
     def next_page(self):
         total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
         self.page = (self.page + 1) % total_pages
@@ -236,7 +245,7 @@ class MFRC522Plugin(QWidget):
         self.page = (self.page - 1 + total_pages) % total_pages
         self.update_checkboxes()
 
-    # ---------------------- Save/load cards ----------------------
+    # ---------------------- Save/load ----------------------
     def save_cards(self):
         try:
             with open(CARDS_FILE, "w") as f:
