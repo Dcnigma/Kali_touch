@@ -4,10 +4,10 @@ import sys
 import json
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout,
-    QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
+    QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip, QGraphicsOpacityEffect
 )
 from PyQt6.QtGui import QPixmap, QPalette, QBrush
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QPropertyAnimation
 
 
 # Ensure plugin folder is in sys.path
@@ -76,6 +76,15 @@ class MFRC522Plugin(QWidget):
         self.anim_timer = QTimer()
         self.anim_timer.timeout.connect(self.update_animation)
         self.anim_timer.start(ANIMATION_INTERVAL)
+
+        # ---------------------- Fade-in Animation ----------------------
+        self.opacity_effect = QGraphicsOpacityEffect(self)
+        self.setGraphicsEffect(self.opacity_effect)
+        self.fade_animation = QPropertyAnimation(self.opacity_effect, b"opacity")
+        self.fade_animation.setDuration(1200)
+        self.fade_animation.setStartValue(0)
+        self.fade_animation.setEndValue(1)
+        self.fade_animation.start()
 
     # ---------------------- UI ----------------------
     def init_ui(self):
@@ -202,6 +211,7 @@ class MFRC522Plugin(QWidget):
             self.goto_page_for_uid(highlight_uid)
 
     def update_animation(self):
+        """Handles green highlight fade-out effect on scanned cards."""
         for cb in self.checkboxes:
             uid = cb.text()
             if uid in self.animations and self.animations[uid] > 0:
@@ -242,3 +252,11 @@ class MFRC522Plugin(QWidget):
             except Exception as e:
                 self.log_message(f"Error loading cards: {e}")
                 self.cards = []
+
+
+# Standalone mode (for testing)
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    win = MFRC522Plugin()
+    win.show()
+    sys.exit(app.exec())
