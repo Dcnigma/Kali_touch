@@ -15,6 +15,12 @@
     "width": 940,
     "height": 800
   },
+  "PHOTO GALLERY": {
+  "plugin": "plugins.photoGallery_plugin:PhotoGalleryPlugin",
+  "touch_icon": "icons/photos.png",
+  "x": 1,
+  "y": 0
+  },
     "Metasploit": {
     "cmd": "/usr/share/kali-menu/helper-scripts/metasploit-framework.sh",
     "touch_icon": "icons/Textedit.png",
