@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+import json
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
 )
@@ -24,6 +25,8 @@ COLUMNS = 2
 ROWS = 8
 ANIMATION_STEPS = 10
 ANIMATION_INTERVAL = 50  # ms
+CARDS_FILE = os.path.join(plugin_folder, "cards.json")
+
 
 class MFRC522Plugin(QWidget):
     def __init__(self, parent=None, apps=None, cfg=None):
@@ -31,8 +34,8 @@ class MFRC522Plugin(QWidget):
         self.cfg = cfg
 
         # Window size and position
-        self.setFixedSize(1200, 900)  # wider window
-        self.move(0, 0)  # start at top-left corner
+        self.setFixedSize(1000, 900)  # width 1000
+        self.move(0, 0)  # start at top-left
         self.setWindowTitle("RFID Reader")
 
         self.cards = []
@@ -41,6 +44,7 @@ class MFRC522Plugin(QWidget):
         self.continue_reading = True
         self.animations = {}  # uid -> current animation step
 
+        self.load_cards()  # Load saved cards from JSON
         self.init_ui()
 
         if LIB_AVAILABLE:
@@ -58,6 +62,7 @@ class MFRC522Plugin(QWidget):
         self.anim_timer.timeout.connect(self.update_animation)
         self.anim_timer.start(ANIMATION_INTERVAL)
 
+    # ---------------------- UI ----------------------
     def init_ui(self):
         main_layout = QVBoxLayout()
         self.setLayout(main_layout)
@@ -90,7 +95,7 @@ class MFRC522Plugin(QWidget):
         # Pagination
         pagination_layout = QHBoxLayout()
         self.prev_button = QPushButton("Previous")
-        self.prev_button.setFixedSize(120, 40)  # smaller buttons
+        self.prev_button.setFixedSize(120, 40)
         self.prev_button.clicked.connect(self.prev_page)
         self.next_button = QPushButton("Next")
         self.next_button.setFixedSize(120, 40)
@@ -101,6 +106,9 @@ class MFRC522Plugin(QWidget):
 
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
+        self.update_checkboxes()  # Show saved cards on load
+
+    # ---------------------- Checkbox ----------------------
     def checkbox_clicked(self):
         cb = self.sender()
         if cb.text():
@@ -108,12 +116,15 @@ class MFRC522Plugin(QWidget):
             QToolTip.showText(cb.mapToGlobal(cb.rect().center()), "Copied!", cb)
             QTimer.singleShot(1000, QToolTip.hideText)
 
+    # ---------------------- Logging ----------------------
     def log_message(self, text):
         print(text)
 
+    # ---------------------- UID helpers ----------------------
     def uid_to_string(self, uid):
         return ''.join(format(i, '02X') for i in uid)
 
+    # ---------------------- Card reading ----------------------
     def check_card(self):
         if not LIB_AVAILABLE:
             return
@@ -125,9 +136,11 @@ class MFRC522Plugin(QWidget):
                 uid_str = self.uid_to_string(uid)
                 if uid_str not in self.cards:
                     self.cards.append(uid_str)
+                    self.save_cards()
                 self.animations[uid_str] = ANIMATION_STEPS
                 self.update_checkboxes(uid_str)
 
+    # ---------------------- Checkbox update ----------------------
     def update_checkboxes(self, highlight_uid=None):
         total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
         self.page = min(self.page, total_pages - 1)
@@ -151,6 +164,7 @@ class MFRC522Plugin(QWidget):
             self.page = index // CARDS_PER_PAGE
             self.update_checkboxes(highlight_uid)
 
+    # ---------------------- Animation ----------------------
     def update_animation(self):
         for i, cb in enumerate(self.checkboxes):
             uid = cb.text()
@@ -163,6 +177,7 @@ class MFRC522Plugin(QWidget):
                 cb.setStyleSheet("color: lightgrey; font-size: 24px; padding: 20px;")
                 del self.animations[uid]
 
+    # ---------------------- Pagination ----------------------
     def next_page(self):
         total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
         self.page = (self.page + 1) % total_pages
@@ -172,3 +187,20 @@ class MFRC522Plugin(QWidget):
         total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
         self.page = (self.page - 1 + total_pages) % total_pages
         self.update_checkboxes()
+
+    # ---------------------- Save/Load ----------------------
+    def save_cards(self):
+        try:
+            with open(CARDS_FILE, "w") as f:
+                json.dump(self.cards, f)
+        except Exception as e:
+            self.log_message(f"Error saving cards: {e}")
+
+    def load_cards(self):
+        if os.path.exists(CARDS_FILE):
+            try:
+                with open(CARDS_FILE, "r") as f:
+                    self.cards = json.load(f)
+            except Exception as e:
+                self.log_message(f"Error loading cards: {e}")
+                self.cards = []
