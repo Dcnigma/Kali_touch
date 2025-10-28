@@ -23,21 +23,43 @@ with open(CONFIG_FILE, "r") as f:
 class FloatingCloseButton(QPushButton):
     def __init__(self, callback, screen_w=SCREEN_W, margin=20):
         super().__init__("✕")
-        size = 72
+        size = 48  # slightly smaller
         self.setFixedSize(size, size)
         self.setStyleSheet(f"""
             QPushButton {{
-                font-size: 28px;
-                background-color: rgba(0,0,0,160);
+                font-size: 24px;
+                background-color: rgba(0,0,0,100);  /* more subtle */
                 color: white;
                 border-radius: {size//2}px;
-                border: 2px solid rgba(255,255,255,160);
+                border: 1px solid rgba(255,255,255,120);
             }}
-            QPushButton:hover {{ background-color: rgba(200,0,0,200); }}
+            QPushButton:hover {{
+                background-color: rgba(255,0,0,180);  /* subtle red on hover */
+            }}
         """)
         self.clicked.connect(callback)
         self._screen_w = screen_w
         self._margin = margin
+
+        # Optional: fade animation
+        self.anim = QPropertyAnimation(self, b"windowOpacity")
+        self.setWindowOpacity(0.6)  # default slightly transparent
+
+    def enterEvent(self, event):
+        self.anim.stop()
+        self.anim.setDuration(200)
+        self.anim.setStartValue(self.windowOpacity())
+        self.anim.setEndValue(1.0)  # fully visible on hover
+        self.anim.start()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.anim.stop()
+        self.anim.setDuration(300)
+        self.anim.setStartValue(self.windowOpacity())
+        self.anim.setEndValue(0.6)  # back to subtle
+        self.anim.start()
+        super().leaveEvent(event)
 
     def set_parent_parent(self, parent_widget):
         self.setParent(parent_widget)
