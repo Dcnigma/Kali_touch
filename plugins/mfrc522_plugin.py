@@ -35,7 +35,7 @@ class MFRC522Plugin(QWidget):
         self.cfg = cfg
 
         # Window size and position
-        self.setFixedSize(1015, 500)
+        self.setFixedSize(1015, 570)
         self.move(-50, 0)
         self.setWindowTitle("RFID Reader")
 
