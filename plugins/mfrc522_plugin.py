@@ -6,10 +6,10 @@ from PyQt6.QtWidgets import (
     QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout,
     QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
 )
-from PyQt6.QtGui import QPixmap, QPalette, QBrush, QFont
+from PyQt6.QtGui import QPixmap, QPalette, QBrush
 from PyQt6.QtCore import Qt, QTimer
 
-# ---------------------- Plugin folder ----------------------
+# Ensure plugin folder is in sys.path
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
 if plugin_folder not in sys.path:
     sys.path.insert(0, plugin_folder)
@@ -21,7 +21,6 @@ try:
 except ImportError:
     LIB_AVAILABLE = False
 
-# ---------------------- Constants ----------------------
 CARDS_PER_PAGE = 8  # 2 columns x 4 rows
 COLUMNS = 2
 ROWS = 4
@@ -40,7 +39,7 @@ class MFRC522Plugin(QWidget):
         self.move(-50, 0)
         self.setWindowTitle("RFID Reader")
 
-        # ---------------------- Background ----------------------
+        # ---------------------- Background image ----------------------
         bg_path = os.path.join(plugin_folder, "background.png")
         if os.path.exists(bg_path):
             pixmap = QPixmap(bg_path).scaled(
@@ -51,11 +50,20 @@ class MFRC522Plugin(QWidget):
             self.setAutoFillBackground(True)
             self.setPalette(palette)
 
-        # ---------------------- Data ----------------------
+        # ---------------------- Data structures ----------------------
         self.cards = []
         self.page = 0
         self.checkboxes = []
         self.animations = {}
+
+        # For page indicator animation
+        self.page_target = 0
+        self.page_anim_pos = 0.0
+        self.page_anim_step = 0.1  # speed
+        self.page_label = QLabel("")
+        self.page_anim_timer = QTimer()
+        self.page_anim_timer.timeout.connect(self.animate_page_indicator)
+        self.page_anim_timer.start(ANIMATION_INTERVAL)
 
         self.load_cards()
         self.init_ui()
@@ -106,7 +114,7 @@ class MFRC522Plugin(QWidget):
         spacer_logo.setFixedHeight(20)
         main_layout.addWidget(spacer_logo)
 
-        # Grid container
+        # Grid container with semi-transparent background
         self.grid_widget = QWidget()
         self.grid_layout = QGridLayout()
         self.grid_widget.setLayout(self.grid_layout)
@@ -124,29 +132,24 @@ class MFRC522Plugin(QWidget):
                 self.grid_layout.addWidget(cb, i, j)
                 self.checkboxes.append(cb)
 
-        # ---------------------- Pagination ----------------------
+        # Pagination buttons with page label
         pagination_layout = QHBoxLayout()
         self.prev_button = QPushButton("Previous")
         self.prev_button.setFixedSize(100, 35)
         self.prev_button.clicked.connect(self.prev_page)
-        pagination_layout.addWidget(self.prev_button)
-
-        # Fancy page indicator
-        self.page_label = QLabel()
-        self.page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.page_label.setFont(QFont("Monospace", 14))
-        pagination_layout.addWidget(self.page_label)
-
         self.next_button = QPushButton("Next")
         self.next_button.setFixedSize(100, 35)
         self.next_button.clicked.connect(self.next_page)
+
+        self.page_label.setStyleSheet("color: white; font-size: 18px;")
+        pagination_layout.addWidget(self.prev_button)
+        pagination_layout.addWidget(self.page_label)
         pagination_layout.addWidget(self.next_button)
+
         main_layout.addLayout(pagination_layout)
 
-        # Expanding spacer at bottom
+        # Spacer at bottom
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
-        # Show saved cards
         self.update_checkboxes()
 
     # ---------------------- Checkbox click ----------------------
@@ -181,20 +184,13 @@ class MFRC522Plugin(QWidget):
                 self.animations[uid_str] = ANIMATION_STEPS
                 self.goto_page_for_uid(uid_str)
 
-    # ---------------------- Pagination ----------------------
+    # ---------------------- Pagination & display ----------------------
     def goto_page_for_uid(self, uid_str):
         index = self.cards.index(uid_str)
         new_page = index // CARDS_PER_PAGE
         if new_page != self.page:
-            self.page = new_page
+            self.page_target = new_page
         self.update_checkboxes(uid_str)
-
-    def update_page_indicator(self):
-        total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
-        indicator = ""
-        for i in range(total_pages):
-            indicator += "⃝" if i == self.page else "𖣠"
-        self.page_label.setText(f"[{indicator}]")
 
     def update_checkboxes(self, highlight_uid=None):
         total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
@@ -214,13 +210,10 @@ class MFRC522Plugin(QWidget):
                 cb.setChecked(False)
                 cb.setEnabled(False)
 
-        # Update fancy page indicator
-        self.update_page_indicator()
-
         if highlight_uid and highlight_uid not in page_cards:
             self.goto_page_for_uid(highlight_uid)
 
-    # ---------------------- Animation ----------------------
+    # ---------------------- Fade-in animation ----------------------
     def update_animation(self):
         for cb in self.checkboxes:
             uid = cb.text()
@@ -235,17 +228,40 @@ class MFRC522Plugin(QWidget):
                 cb.setStyleSheet("color: lightgrey; font-size: 22px; padding: 20px;")
                 del self.animations[uid]
 
+    # ---------------------- Page indicator animation ----------------------
+    def update_page_indicator(self):
+        total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
+        indicator = ""
+        for i in range(total_pages):
+            if abs(i - self.page_anim_pos) < 0.5:
+                indicator += "⃝"
+            else:
+                indicator += "𖣠"
+        self.page_label.setText(f"[{indicator}]")
+
+    def animate_page_indicator(self):
+        if abs(self.page_anim_pos - self.page_target) < 0.01:
+            self.page_anim_pos = float(self.page_target)
+        elif self.page_anim_pos < self.page_target:
+            self.page_anim_pos += self.page_anim_step
+        elif self.page_anim_pos > self.page_target:
+            self.page_anim_pos -= self.page_anim_step
+        self.update_page_indicator()
+
+    # ---------------------- Pagination buttons ----------------------
     def next_page(self):
         total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
-        self.page = (self.page + 1) % total_pages
+        self.page_target = (self.page_target + 1) % total_pages
+        self.page = round(self.page_anim_pos)
         self.update_checkboxes()
 
     def prev_page(self):
         total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
-        self.page = (self.page - 1 + total_pages) % total_pages
+        self.page_target = (self.page_target - 1 + total_pages) % total_pages
+        self.page = round(self.page_anim_pos)
         self.update_checkboxes()
 
-    # ---------------------- Save/load ----------------------
+    # ---------------------- Save/load cards ----------------------
     def save_cards(self):
         try:
             with open(CARDS_FILE, "w") as f:
