@@ -2,10 +2,10 @@
 import os
 import sys
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QApplication
+    QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout, QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
 )
 from PyQt6.QtGui import QPixmap, QColor, QPalette
-from PyQt6.QtCore import Qt, QTimer, QMimeData
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QClipboard
 
 # Ensure plugin folder is in sys.path
@@ -51,6 +51,9 @@ class MFRC522Plugin(QWidget):
         main_layout = QVBoxLayout()
         self.setLayout(main_layout)
 
+        # Top spacer for vertical centering
+        main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+
         # Logo
         self.logo_label = QLabel(self)
         logo_path = os.path.join(plugin_folder, "logo.png")
@@ -58,18 +61,28 @@ class MFRC522Plugin(QWidget):
             pixmap = QPixmap(logo_path).scaled(200, 50, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             self.logo_label.setPixmap(pixmap)
             self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(self.logo_label)
+        main_layout.addWidget(self.logo_label, alignment=Qt.AlignmentFlag.AlignHCenter)
+
+        # Optional background label
+        self.bg_label = QLabel(self)
+        bg_path = os.path.join(plugin_folder, "background.png")
+        if os.path.exists(bg_path):
+            pixmap = QPixmap(bg_path).scaled(self.width(), self.height(), Qt.AspectRatioMode.KeepAspectRatioByExpanding, Qt.TransformationMode.SmoothTransformation)
+            self.bg_label.setPixmap(pixmap)
+            self.bg_label.setGeometry(0, 0, self.width(), self.height())
+            self.bg_label.lower()
 
         # Checkbox grid
         self.grid_widget = QWidget()
         self.grid_layout = QGridLayout()
         self.grid_widget.setLayout(self.grid_layout)
-        main_layout.addWidget(self.grid_widget)
+        self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,100); border-radius: 10px;")
+        main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignHCenter)
 
         for i in range(ROWS):
             for j in range(COLUMNS):
                 cb = QCheckBox("")
-                cb.setStyleSheet("color: lightgrey; font-size: 9px;")
+                cb.setStyleSheet("color: lightgrey; font-size: 10px;")
                 cb.stateChanged.connect(self.checkbox_clicked)
                 self.grid_layout.addWidget(cb, i, j)
                 self.checkboxes.append(cb)
@@ -84,11 +97,16 @@ class MFRC522Plugin(QWidget):
         pagination_layout.addWidget(self.next_button)
         main_layout.addLayout(pagination_layout)
 
+        # Bottom spacer for vertical centering
+        main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+
     def checkbox_clicked(self):
         cb = self.sender()
         if cb.text():
-            clipboard = QApplication.clipboard()
-            clipboard.setText(cb.text())
+            QApplication.clipboard().setText(cb.text())
+            # Show tooltip feedback
+            QToolTip.showText(cb.mapToGlobal(cb.rect().center()), "Copied!", cb)
+            QTimer.singleShot(1000, QToolTip.hideText)
 
     def log_message(self, text):
         print(text)  # optional console log
@@ -131,7 +149,7 @@ class MFRC522Plugin(QWidget):
                 cb.setChecked(False)
                 cb.setEnabled(False)
 
-        # If highlighted UID is not on current page, switch page
+        # Switch page if highlighted UID not visible
         if highlight_uid and highlight_uid not in page_cards:
             index = self.cards.index(highlight_uid)
             self.page = index // CARDS_PER_PAGE
