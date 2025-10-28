@@ -113,6 +113,12 @@ class RfidPlayerPlugin(QWidget):
         pagination_layout.addWidget(self.next_button)
         main_layout.addLayout(pagination_layout)
 
+        # Save button
+        self.save_button = QPushButton("Save")
+        self.save_button.setFixedSize(100, 35)
+        self.save_button.clicked.connect(self.save_videos)
+        main_layout.addWidget(self.save_button, alignment=Qt.AlignmentFlag.AlignCenter)
+
         # Last scanned UID label
         self.last_scanned_label = QLabel("Last scanned: None")
         self.last_scanned_label.setStyleSheet("color: lightgrey; font-size: 16px;")
@@ -142,7 +148,7 @@ class RfidPlayerPlugin(QWidget):
             self.save_videos()
 
     def save_videos(self):
-        self.video_map = {}
+        # Update video_map with current grid
         for uid_input, video_input in zip(self.uid_inputs, self.video_inputs):
             uid = uid_input.text().strip()
             video = video_input.text().strip()
@@ -154,14 +160,16 @@ class RfidPlayerPlugin(QWidget):
         except Exception as e:
             self.log_message(f"Error saving video map: {e}")
 
+        # Refresh all_videos for pagination
+        self.all_videos = list(self.video_map.items())
+        self.update_grid()
+
     # ---------------------- Scan folder for mp4 ----------------------
     def scan_plugin_folder_for_videos(self):
         files = [f for f in os.listdir(plugin_folder) if f.lower().endswith(".mp4")]
-        # Add new videos not already in JSON
         for f in files:
             if f not in self.video_map.values():
                 self.video_map[""] = f  # empty UID
-        # Build the full list for pagination
         self.all_videos = list(self.video_map.items())
 
     # ---------------------- Grid update ----------------------
@@ -179,7 +187,7 @@ class RfidPlayerPlugin(QWidget):
         page_videos = self.all_videos[start_index:end_index]
 
         for row, (uid, video) in enumerate(page_videos):
-            uid_label = QLabel(f"UID:")
+            uid_label = QLabel("UID:")
             uid_label.setStyleSheet("color: lightgrey; font-size: 16px;")
             uid_input = QLineEdit(uid)
             uid_input.setStyleSheet("font-size: 16px;")
