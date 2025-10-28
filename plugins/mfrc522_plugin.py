@@ -112,8 +112,12 @@ class MFRC522Plugin(QWidget):
         # Pagination
         pagination_layout = QHBoxLayout()
         self.prev_button = QPushButton("Previous")
+        self.prev_button.setFixedSize(80, 30)  # width=80px, height=30px
+        self.prev_button.setStyleSheet("font-size: 12px; padding: 2px;")
         self.prev_button.clicked.connect(self.prev_page)
         self.next_button = QPushButton("Next")
+        self.next_button.setFixedSize(80, 30)
+        self.next_button.setStyleSheet("font-size: 12px; padding: 2px;")        
         self.next_button.clicked.connect(self.next_page)
         pagination_layout.addWidget(self.prev_button)
         pagination_layout.addWidget(self.next_button)
