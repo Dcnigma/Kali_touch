@@ -6,7 +6,7 @@ import time
 import subprocess
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QLineEdit, QPushButton, QVBoxLayout, QHBoxLayout,
-    QGridLayout, QApplication, QSpacerItem, QSizePolicy
+    QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
 )
 from PyQt6.QtGui import QPixmap, QPalette, QBrush
 from PyQt6.QtCore import Qt, QTimer
@@ -25,7 +25,7 @@ except ImportError:
 
 ROWS = 4
 COLUMNS = 2
-CARDS_PER_PAGE = ROWS * COLUMNS
+VIDEOS_PER_PAGE = ROWS * COLUMNS
 VIDEO_FILE = os.path.join(plugin_folder, "videos.json")
 
 
@@ -51,16 +51,20 @@ class RfidPlayerPlugin(QWidget):
             self.setPalette(palette)
 
         # ---------------------- Data structures ----------------------
-        self.video_map = {}
-        self.load_videos()
-        self.scan_plugin_videos()
+        self.video_map = {}  # UID -> video filename
+        self.video_list = []  # ordered list of dicts: {"uid":..., "video":...}
         self.current_uid = None
         self.my_subprocess = None
         self.page = 0
+
+        # UI inputs
         self.uid_inputs = []
         self.video_inputs = []
 
+        self.load_videos()
+        self.scan_folder_for_videos()
         self.init_ui()
+        self.fill_grid()
 
         if LIB_AVAILABLE:
             self.reader = MFRC522.MFRC522()
@@ -92,34 +96,28 @@ class RfidPlayerPlugin(QWidget):
             self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
         main_layout.addWidget(self.logo_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Spacer
-        spacer_logo = QWidget()
-        spacer_logo.setFixedHeight(20)
-        main_layout.addWidget(spacer_logo)
+        main_layout.addWidget(QWidget(), alignment=Qt.AlignmentFlag.AlignTop)  # spacer
 
         # Grid container
         self.grid_widget = QWidget()
-        self.grid_widget.setFixedSize(700, 300)
+        self.grid_widget.setFixedSize(700, 320)
         self.grid_layout = QGridLayout()
         self.grid_widget.setLayout(self.grid_layout)
         self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,120); border-radius: 10px;")
         main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Fill grid for first page
-        self.fill_grid()
-
         # Pagination buttons
-        pagination_layout = QHBoxLayout()
+        pag_layout = QHBoxLayout()
         self.prev_button = QPushButton("Previous")
         self.prev_button.setFixedSize(100, 35)
         self.prev_button.clicked.connect(self.prev_page)
         self.next_button = QPushButton("Next")
         self.next_button.setFixedSize(100, 35)
         self.next_button.clicked.connect(self.next_page)
-        pagination_layout.addWidget(self.prev_button)
-        pagination_layout.addStretch()
-        pagination_layout.addWidget(self.next_button)
-        main_layout.addLayout(pagination_layout)
+        pag_layout.addWidget(self.prev_button)
+        pag_layout.addStretch()
+        pag_layout.addWidget(self.next_button)
+        main_layout.addLayout(pag_layout)
 
         # Save button
         self.save_button = QPushButton("Save")
@@ -133,64 +131,16 @@ class RfidPlayerPlugin(QWidget):
         self.last_scanned_label.mousePressEvent = self.copy_last_uid_to_clipboard
         main_layout.addWidget(self.last_scanned_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Spacer at bottom
+        # Bottom spacer
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
-    # ---------------------- Fill grid ----------------------
-    def fill_grid(self):
-        # Clear previous
-        for i in reversed(range(self.grid_layout.count())):
-            self.grid_layout.itemAt(i).widget().setParent(None)
-        self.uid_inputs = []
-        self.video_inputs = []
-
-        all_videos = list(self.video_map.items())
-        total_pages = max(1, (len(all_videos) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
-        self.page = min(self.page, total_pages - 1)
-
-        start_index = self.page * CARDS_PER_PAGE
-        end_index = start_index + CARDS_PER_PAGE
-        page_videos = all_videos[start_index:end_index]
-
-        for i, (uid, video) in enumerate(page_videos):
-            row = i % ROWS
-            col = i // ROWS
-            uid_label = QLabel(f"UID {start_index + i +1}:")
-            uid_label.setStyleSheet("color: lightgrey; font-size: 18px;")
-            uid_input = QLineEdit(uid)
-            uid_input.setStyleSheet("font-size: 16px;")
-            video_input = QLineEdit(video)
-            video_input.setStyleSheet("font-size: 16px;")
-            self.grid_layout.addWidget(uid_label, row, col*3)
-            self.grid_layout.addWidget(uid_input, row, col*3+1)
-            self.grid_layout.addWidget(video_input, row, col*3+2)
-            self.uid_inputs.append(uid_input)
-            self.video_inputs.append(video_input)
-
-    # ---------------------- Pagination ----------------------
-    def next_page(self):
-        self.page += 1
-        self.fill_grid()
-
-    def prev_page(self):
-        self.page = max(0, self.page - 1)
-        self.fill_grid()
-
-    # ---------------------- Video folder scan ----------------------
-    def scan_plugin_videos(self):
-        for file in os.listdir(plugin_folder):
-            if file.lower().endswith(".mp4") and file not in self.video_map.values():
-                self.video_map[""] = file  # empty UID initially
-        self._save_videos_to_file()
 
     # ---------------------- Load/save ----------------------
     def load_videos(self):
         if os.path.exists(VIDEO_FILE):
             try:
-                with open(VIDEO_FILE, "r") as f:
-                    self.video_map = json.load(f)
+                self.video_map = json.load(open(VIDEO_FILE, "r"))
             except Exception as e:
-                print(f"Error loading video map: {e}")
+                self.log_message(f"Error loading videos.json: {e}")
                 self.video_map = {}
         else:
             # default example
@@ -200,25 +150,72 @@ class RfidPlayerPlugin(QWidget):
                 "F93264E6": "Skull.mp4",
                 "BEA65461": "stop"
             }
-            self._save_videos_to_file()
+            self.save_videos()
 
     def save_videos(self):
-        """Read UI inputs and save them to the video map + JSON."""
-        for uid_input, video_input in zip(self.uid_inputs, self.video_inputs):
-            uid = uid_input.text().strip()
-            video = video_input.text().strip()
-            if uid and video:
+        # update video_map from current UI
+        for i, entry in enumerate(self.video_list):
+            uid = self.uid_inputs[i].text().strip()
+            video = self.video_inputs[i].text().strip()
+            if video:
                 self.video_map[uid] = video
-        self._save_videos_to_file()
-        self.fill_grid()
-
-    def _save_videos_to_file(self):
-        """Save current video_map to JSON (UI not required)."""
         try:
             with open(VIDEO_FILE, "w") as f:
                 json.dump(self.video_map, f)
         except Exception as e:
-            self.log_message(f"Error saving video map: {e}")
+            self.log_message(f"Error saving videos.json: {e}")
+
+    # ---------------------- Scan folder for mp4s ----------------------
+    def scan_folder_for_videos(self):
+        existing_files = set(self.video_map.values())
+        for f in os.listdir(plugin_folder):
+            if f.lower().endswith(".mp4") and f not in existing_files:
+                # add new video with empty UID
+                self.video_list.append({"uid": "", "video": f})
+        # include existing video_map entries
+        for uid, video in self.video_map.items():
+            if video not in [v["video"] for v in self.video_list]:
+                self.video_list.append({"uid": uid, "video": video})
+
+    # ---------------------- Fill the grid UI ----------------------
+    def fill_grid(self):
+        # clear previous widgets
+        while self.grid_layout.count():
+            item = self.grid_layout.takeAt(0)
+            w = item.widget()
+            if w:
+                w.deleteLater()
+
+        self.uid_inputs.clear()
+        self.video_inputs.clear()
+
+        start = self.page * VIDEOS_PER_PAGE
+        end = start + VIDEOS_PER_PAGE
+        page_items = self.video_list[start:end]
+
+        for i, entry in enumerate(page_items):
+            uid_label = QLabel(f"UID {start+i+1}:")
+            uid_label.setStyleSheet("color: lightgrey; font-size: 18px;")
+            uid_input = QLineEdit(entry["uid"])
+            uid_input.setStyleSheet("font-size: 16px;")
+            video_input = QLineEdit(entry["video"])
+            video_input.setStyleSheet("font-size: 16px;")
+            self.grid_layout.addWidget(uid_label, i, 0)
+            self.grid_layout.addWidget(uid_input, i, 1)
+            self.grid_layout.addWidget(video_input, i, 2)
+            self.uid_inputs.append(uid_input)
+            self.video_inputs.append(video_input)
+
+    # ---------------------- Pagination ----------------------
+    def next_page(self):
+        total_pages = max(1, (len(self.video_list) + VIDEOS_PER_PAGE - 1) // VIDEOS_PER_PAGE)
+        self.page = (self.page + 1) % total_pages
+        self.fill_grid()
+
+    def prev_page(self):
+        total_pages = max(1, (len(self.video_list) + VIDEOS_PER_PAGE - 1) // VIDEOS_PER_PAGE)
+        self.page = (self.page - 1 + total_pages) % total_pages
+        self.fill_grid()
 
     # ---------------------- Card reading ----------------------
     def check_card(self):
@@ -248,14 +245,17 @@ class RfidPlayerPlugin(QWidget):
         self.my_subprocess = None
 
     def play_video_for_uid(self, uid_str):
+        # stop video if stop card
+        if uid_str in self.video_map and self.video_map[uid_str].lower() == "stop":
+            self.stop_current_video()
+            return
+
+        # play video if UID matches
         if uid_str in self.video_map:
             video_file = self.video_map[uid_str]
-            if video_file.lower() == "stop":
-                self.stop_current_video()
-                return
-            self.stop_current_video()
             video_path = os.path.join(plugin_folder, video_file)
             if os.path.exists(video_path):
+                self.stop_current_video()
                 cmd = ("/bin/ffplay", "-fs", "-autoexit", "-loop", "0", video_path)
                 self.my_subprocess = subprocess.Popen(cmd, stdin=subprocess.PIPE,
                                                      stdout=subprocess.PIPE,
