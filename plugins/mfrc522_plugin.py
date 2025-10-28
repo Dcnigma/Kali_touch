@@ -40,17 +40,21 @@ class MFRC522Plugin(QWidget):
         self.move(0, 0)
         self.setWindowTitle("RFID Reader")
 
-        # ---------------------- Background image ----------------------
-        bg_path = os.path.join(plugin_folder, "background.png")
-        if os.path.exists(bg_path):
-            self.setStyleSheet(f"""
-                MFRC522Plugin {{
-                    background-image: url("{bg_path}");
-                    background-repeat: no-repeat;
-                    background-position: center;
-                    background-size: cover;
-                }}
-            """)
+# ---------------------- Background image ----------------------
+bg_path = os.path.join(plugin_folder, "background.png")
+if os.path.exists(bg_path):
+    self.bg_label = QLabel(self)
+    self.bg_label.setGeometry(0, 0, 1015, 570)
+    self.bg_label.setPixmap(
+        QPixmap(bg_path).scaled(
+            1015, 570,
+            Qt.AspectRatioMode.KeepAspectRatioByExpanding,
+            Qt.TransformationMode.SmoothTransformation
+        )
+    )
+    self.bg_label.lower()  # push it behind all widgets
+else:
+    print("⚠️ background.png not found at:", bg_path)
 
         self.cards = []
         self.page = 0
