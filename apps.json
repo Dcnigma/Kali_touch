@@ -37,6 +37,12 @@
     "x": 0,
     "y": 0    
   },
+  "RFID Video": {
+    "plugin": "plugins.rfidPlayer_plugin:RfidPlayerPlugin",
+    "touch_icon": "icons/nmap.png",
+    "x": 0,
+    "y": 0    
+  },  
   "Nmap Plugin": {
     "plugin": "plugins.nmap_plugin:NmapPlugin",
     "touch_icon": "icons/nmap.png",
