@@ -34,12 +34,11 @@ class RfidPlayerPlugin(QWidget):
         super().__init__(parent)
         self.cfg = cfg
 
-        # ---------------------- Window setup ----------------------
         self.setFixedSize(1015, 570)
         self.move(-50, 0)
         self.setWindowTitle("RFID Video Player")
 
-        # ---------------------- Background ----------------------
+        # Background
         bg_path = os.path.join(plugin_folder, "background.png")
         if os.path.exists(bg_path):
             pixmap = QPixmap(bg_path).scaled(
@@ -50,31 +49,24 @@ class RfidPlayerPlugin(QWidget):
             self.setAutoFillBackground(True)
             self.setPalette(palette)
 
-        # ---------------------- Data structures ----------------------
-        self.video_map = {}  # UID -> video filename
-        self.video_list = []  # ordered list of dicts: {"uid":..., "video":...}
+        self.video_map = {}
+        self.video_list = []  # list of dicts: {"uid": "", "video": ""}
         self.current_uid = None
         self.my_subprocess = None
         self.page = 0
 
-        # UI inputs
-        self.uid_inputs = []
-        self.video_inputs = []
-
         self.load_videos()
-        self.scan_folder_for_videos()
+        self.scan_plugin_folder_for_videos()
         self.init_ui()
-        self.fill_grid()
 
         if LIB_AVAILABLE:
             self.reader = MFRC522.MFRC522()
         else:
             self.log_message(
-                "MFRC522 Python library not available on this system.\n"
-                "Place MFRC522.py in the same folder as this plugin to read cards."
+                "MFRC522 Python library not available.\n"
+                "Place MFRC522.py in the same folder as this plugin."
             )
 
-        # ---------------------- Timers ----------------------
         self.timer = QTimer()
         self.timer.timeout.connect(self.check_card)
         self.timer.start(500)
@@ -88,36 +80,34 @@ class RfidPlayerPlugin(QWidget):
         self.logo_label = QLabel(self)
         logo_path = os.path.join(plugin_folder, "logo.png")
         if os.path.exists(logo_path):
-            pixmap = QPixmap(logo_path).scaled(
-                200, 50, Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
+            pixmap = QPixmap(logo_path).scaled(200, 50, Qt.AspectRatioMode.KeepAspectRatio,
+                                               Qt.TransformationMode.SmoothTransformation)
             self.logo_label.setPixmap(pixmap)
             self.logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop)
         main_layout.addWidget(self.logo_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         main_layout.addWidget(QWidget(), alignment=Qt.AlignmentFlag.AlignTop)  # spacer
 
-        # Grid container
+        # Grid for video mapping
         self.grid_widget = QWidget()
-        self.grid_widget.setFixedSize(700, 320)
+        self.grid_widget.setFixedSize(700, 300)
         self.grid_layout = QGridLayout()
         self.grid_widget.setLayout(self.grid_layout)
         self.grid_widget.setStyleSheet("background-color: rgba(0,0,0,120); border-radius: 10px;")
         main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Pagination buttons
-        pag_layout = QHBoxLayout()
+        self.uid_inputs = []
+        self.video_inputs = []
+
+        # Navigation
+        nav_layout = QHBoxLayout()
         self.prev_button = QPushButton("Previous")
-        self.prev_button.setFixedSize(100, 35)
         self.prev_button.clicked.connect(self.prev_page)
         self.next_button = QPushButton("Next")
-        self.next_button.setFixedSize(100, 35)
         self.next_button.clicked.connect(self.next_page)
-        pag_layout.addWidget(self.prev_button)
-        pag_layout.addStretch()
-        pag_layout.addWidget(self.next_button)
-        main_layout.addLayout(pag_layout)
+        nav_layout.addWidget(self.prev_button)
+        nav_layout.addWidget(self.next_button)
+        main_layout.addLayout(nav_layout)
 
         # Save button
         self.save_button = QPushButton("Save")
@@ -131,19 +121,20 @@ class RfidPlayerPlugin(QWidget):
         self.last_scanned_label.mousePressEvent = self.copy_last_uid_to_clipboard
         main_layout.addWidget(self.last_scanned_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # Bottom spacer
         main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+
+        self.update_grid()
 
     # ---------------------- Load/save ----------------------
     def load_videos(self):
         if os.path.exists(VIDEO_FILE):
             try:
-                self.video_map = json.load(open(VIDEO_FILE, "r"))
+                with open(VIDEO_FILE, "r") as f:
+                    self.video_map = json.load(f)
             except Exception as e:
                 self.log_message(f"Error loading videos.json: {e}")
                 self.video_map = {}
         else:
-            # default example
             self.video_map = {
                 "C0E961C5": "Fingerprint.mp4",
                 "167B001E": "Password.mp4",
@@ -152,48 +143,91 @@ class RfidPlayerPlugin(QWidget):
             }
             self.save_videos()
 
+        # Initialize video_list from video_map
+        self.video_list = [{"uid": uid, "video": video} for uid, video in self.video_map.items()]
+
     def save_videos(self):
-        # update video_map from current UI
-        for i, entry in enumerate(self.video_list):
+        # Update video_list entries for current page
+        start = self.page * VIDEOS_PER_PAGE
+        end = start + VIDEOS_PER_PAGE
+        for i, entry in enumerate(self.video_list[start:end]):
             uid = self.uid_inputs[i].text().strip()
             video = self.video_inputs[i].text().strip()
-            if video:
-                self.video_map[uid] = video
+            entry["uid"] = uid
+            entry["video"] = video
+
+        # Rebuild video_map
+        self.video_map = {entry["uid"]: entry["video"] for entry in self.video_list if entry["uid"] and entry["video"]}
+
         try:
             with open(VIDEO_FILE, "w") as f:
                 json.dump(self.video_map, f)
+            self.log_message("Videos saved successfully!")
         except Exception as e:
             self.log_message(f"Error saving videos.json: {e}")
 
-    # ---------------------- Scan folder for mp4s ----------------------
-    def scan_folder_for_videos(self):
-        existing_files = set(self.video_map.values())
-        for f in os.listdir(plugin_folder):
-            if f.lower().endswith(".mp4") and f not in existing_files:
-                # add new video with empty UID
-                self.video_list.append({"uid": "", "video": f})
-        # include existing video_map entries
-        for uid, video in self.video_map.items():
-            if video not in [v["video"] for v in self.video_list]:
-                self.video_list.append({"uid": uid, "video": video})
+        self.update_grid()
 
-    # ---------------------- Fill the grid UI ----------------------
-    def fill_grid(self):
-        # clear previous widgets
-        while self.grid_layout.count():
-            item = self.grid_layout.takeAt(0)
-            w = item.widget()
-            if w:
-                w.deleteLater()
+    # ---------------------- Card reading ----------------------
+    def check_card(self):
+        if not LIB_AVAILABLE:
+            return
+        status, tag_type = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
+        if status == self.reader.MI_OK:
+            status, uid = self.reader.MFRC522_SelectTagSN()
+            if status == self.reader.MI_OK:
+                uid_str = self.uid_to_string(uid)
+                self.current_uid = uid_str
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+                self.last_scanned_label.setText(f"Last scanned: {timestamp} | UID: {uid_str}")
+                self.play_video_for_uid(uid_str)
+                # Add to video_list if new UID scanned
+                if uid_str not in [e["uid"] for e in self.video_list]:
+                    self.video_list.append({"uid": uid_str, "video": ""})
+                    self.update_grid()
 
-        self.uid_inputs.clear()
-        self.video_inputs.clear()
+    def uid_to_string(self, uid):
+        return ''.join(format(i, '02X') for i in uid)
+
+    # ---------------------- Video playback ----------------------
+    def stop_current_video(self):
+        try:
+            if self.my_subprocess:
+                self.my_subprocess.terminate()
+        except Exception:
+            pass
+        time.sleep(0.2)
+        self.my_subprocess = None
+
+    def play_video_for_uid(self, uid_str):
+        if uid_str in self.video_map:
+            video_file = self.video_map[uid_str]
+            if video_file.lower() == "stop":
+                self.stop_current_video()
+                return
+            self.stop_current_video()
+            video_path = os.path.join(plugin_folder, video_file)
+            if os.path.exists(video_path):
+                cmd = ("/bin/ffplay", "-fs", "-autoexit", "-loop", "0", video_path)
+                self.my_subprocess = subprocess.Popen(cmd, stdin=subprocess.PIPE,
+                                                     stdout=subprocess.PIPE,
+                                                     stderr=subprocess.PIPE)
+
+    # ---------------------- Grid ----------------------
+    def update_grid(self):
+        # Clear old widgets
+        for i in reversed(range(self.grid_layout.count())):
+            widget = self.grid_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
+
+        # Setup inputs for current page
+        self.uid_inputs = []
+        self.video_inputs = []
 
         start = self.page * VIDEOS_PER_PAGE
         end = start + VIDEOS_PER_PAGE
-        page_items = self.video_list[start:end]
-
-        for i, entry in enumerate(page_items):
+        for i, entry in enumerate(self.video_list[start:end]):
             uid_label = QLabel(f"UID {start+i+1}:")
             uid_label.setStyleSheet("color: lightgrey; font-size: 18px;")
             uid_input = QLineEdit(entry["uid"])
@@ -210,56 +244,19 @@ class RfidPlayerPlugin(QWidget):
     def next_page(self):
         total_pages = max(1, (len(self.video_list) + VIDEOS_PER_PAGE - 1) // VIDEOS_PER_PAGE)
         self.page = (self.page + 1) % total_pages
-        self.fill_grid()
+        self.update_grid()
 
     def prev_page(self):
         total_pages = max(1, (len(self.video_list) + VIDEOS_PER_PAGE - 1) // VIDEOS_PER_PAGE)
         self.page = (self.page - 1 + total_pages) % total_pages
-        self.fill_grid()
+        self.update_grid()
 
-    # ---------------------- Card reading ----------------------
-    def check_card(self):
-        if not LIB_AVAILABLE:
-            return
-        status, tag_type = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
-        if status == self.reader.MI_OK:
-            status, uid = self.reader.MFRC522_SelectTagSN()
-            if status == self.reader.MI_OK:
-                uid_str = self.uid_to_string(uid)
-                self.current_uid = uid_str
-                timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
-                self.last_scanned_label.setText(f"Last scanned: {timestamp} | UID: {uid_str}")
-                self.play_video_for_uid(uid_str)
-
-    def uid_to_string(self, uid):
-        return ''.join(format(i, '02X') for i in uid)
-
-    # ---------------------- Video playback ----------------------
-    def stop_current_video(self):
-        try:
-            if self.my_subprocess:
-                self.my_subprocess.terminate()
-        except Exception:
-            pass
-        time.sleep(0.2)
-        self.my_subprocess = None
-
-    def play_video_for_uid(self, uid_str):
-        # stop video if stop card
-        if uid_str in self.video_map and self.video_map[uid_str].lower() == "stop":
-            self.stop_current_video()
-            return
-
-        # play video if UID matches
-        if uid_str in self.video_map:
-            video_file = self.video_map[uid_str]
-            video_path = os.path.join(plugin_folder, video_file)
-            if os.path.exists(video_path):
-                self.stop_current_video()
-                cmd = ("/bin/ffplay", "-fs", "-autoexit", "-loop", "0", video_path)
-                self.my_subprocess = subprocess.Popen(cmd, stdin=subprocess.PIPE,
-                                                     stdout=subprocess.PIPE,
-                                                     stderr=subprocess.PIPE)
+    # ---------------------- Helper ----------------------
+    def scan_plugin_folder_for_videos(self):
+        files = os.listdir(plugin_folder)
+        for f in files:
+            if f.lower().endswith(".mp4") and f not in [e["video"] for e in self.video_list]:
+                self.video_list.append({"uid": "", "video": f})
 
     # ---------------------- Logging & clipboard ----------------------
     def log_message(self, text):
