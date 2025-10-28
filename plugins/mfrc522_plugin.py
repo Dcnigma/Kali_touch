@@ -1,244 +1,246 @@
-#!/usr/bin/env python3
-import os
 import sys
 import json
+import os
+import random
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout,
-    QGridLayout, QApplication, QSpacerItem, QSizePolicy, QToolTip
+    QApplication, QWidget, QLabel, QVBoxLayout, QGridLayout, QPushButton,
+    QGraphicsOpacityEffect, QPropertyAnimation, QStackedLayout
 )
-from PyQt6.QtGui import QPixmap, QPalette, QBrush
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, QSequentialAnimationGroup
+from PyQt6.QtGui import QPixmap, QClipboard, QGuiApplication
 
+CARDS_FILE = "cards.json"
 
-# Ensure plugin folder is in sys.path
-plugin_folder = os.path.dirname(os.path.abspath(__file__))
-if plugin_folder not in sys.path:
-    sys.path.insert(0, plugin_folder)
+class RFIDPlugin(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("RFID Plugin")
+        self.setFixedSize(1000, 800)
 
-# Try to import MFRC522
-try:
-    import MFRC522
-    LIB_AVAILABLE = True
-except ImportError:
-    LIB_AVAILABLE = False
+        # --- Load saved cards ---
+        self.cards = self.load_cards()
 
-CARDS_PER_PAGE = 8  # 2 columns x 4 rows
-COLUMNS = 2
-ROWS = 4
-ANIMATION_STEPS = 10
-ANIMATION_INTERVAL = 50  # ms
-CARDS_FILE = os.path.join(plugin_folder, "cards.json")
+        # --- Background setup ---
+        self.setStyleSheet("""
+            QWidget {
+                background-image: url('background.png');
+                background-repeat: no-repeat;
+                background-position: center;
+                background-size: cover;
+            }
+        """)
 
+        # --- Main layout ---
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
 
-class MFRC522Plugin(QWidget):
-    def __init__(self, parent=None, apps=None, cfg=None):
-        super().__init__(parent)
-        self.cfg = cfg
+        # --- Logo ---
+        self.logo = QLabel()
+        pixmap = QPixmap("logo.png")
+        self.logo.setPixmap(pixmap)
+        self.logo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.logo)
 
-        # ---------------------- Window setup ----------------------
-        self.setFixedSize(1015, 570)
-        self.move(-50, 0)
-        self.setWindowTitle("RFID Reader")
+        # --- White space under logo ---
+        spacer = QLabel("")
+        spacer.setFixedHeight(20)
+        layout.addWidget(spacer)
 
-        # ---------------------- Background image ----------------------
-        bg_path = os.path.join(plugin_folder, "background.png")
-        if os.path.exists(bg_path):
-            pixmap = QPixmap(bg_path).scaled(
-                self.size(), Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation
-            )
-            palette = self.palette()
-            palette.setBrush(QPalette.ColorRole.Window, QBrush(pixmap))
-            self.setAutoFillBackground(True)
-            self.setPalette(palette)
+        # --- Container for grid ---
+        self.grid_container = QWidget()
+        self.grid_container.setStyleSheet("""
+            QWidget {
+                background-color: rgba(0, 0, 0, 50);
+                border-radius: 10px;
+            }
+        """)
+        layout.addWidget(self.grid_container, alignment=Qt.AlignmentFlag.AlignCenter)
 
-        # ---------------------- Data structures ----------------------
-        self.cards = []
-        self.page = 0
-        self.checkboxes = []
-        self.animations = {}
+        # --- Grid for UIDs ---
+        self.grid_layout = QGridLayout(self.grid_container)
+        self.grid_layout.setContentsMargins(30, 30, 30, 30)
+        self.grid_layout.setSpacing(15)
 
-        self.load_cards()
-        self.init_ui()
+        self.uid_buttons = []
+        self.uids_per_page = 8
+        self.current_page = 0
 
-        if LIB_AVAILABLE:
-            self.reader = MFRC522.MFRC522()
-        else:
-            self.log_message(
-                "MFRC522 Python library not available on this system.\n"
-                "Place MFRC522.py in the same folder as this plugin to read cards."
-            )
+        # Create 2x4 grid (8 checkboxes)
+        for i in range(8):
+            btn = QPushButton("Empty")
+            btn.setCheckable(True)
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255,255,255,100);
+                    color: lightgray;
+                    border: 1px solid gray;
+                    border-radius: 6px;
+                    padding: 8px;
+                    font-size: 14px;
+                }
+                QPushButton:checked {
+                    background-color: rgba(0,255,0,80);
+                    color: white;
+                }
+            """)
+            btn.clicked.connect(lambda _, b=btn: self.copy_uid(b))
+            self.uid_buttons.append(btn)
+            row, col = divmod(i, 2)
+            self.grid_layout.addWidget(btn, row, col)
 
-        # ---------------------- Timers ----------------------
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.check_card)
-        self.timer.start(500)
+        # --- Navigation buttons ---
+        nav_layout = QGridLayout()
+        self.prev_button = QPushButton("⟨ Prev")
+        self.next_button = QPushButton("Next ⟩")
 
-        self.anim_timer = QTimer()
-        self.anim_timer.timeout.connect(self.update_animation)
-        self.anim_timer.start(ANIMATION_INTERVAL)
+        for btn in (self.prev_button, self.next_button):
+            btn.setFixedWidth(120)
+            btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(255,255,255,100);
+                    border: 1px solid gray;
+                    border-radius: 8px;
+                    font-weight: bold;
+                    padding: 6px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(255,255,255,150);
+                }
+            """)
 
-    # ---------------------- UI ----------------------
-    def init_ui(self):
-        main_layout = QVBoxLayout()
-        self.setLayout(main_layout)
-
-        # Spacer above logo
-        spacer_top = QWidget()
-        spacer_top.setFixedHeight(10)
-        main_layout.addWidget(spacer_top)
-
-        # Logo top-center
-        self.logo_label = QLabel(self)
-        logo_path = os.path.join(plugin_folder, "logo.png")
-        if os.path.exists(logo_path):
-            pixmap = QPixmap(logo_path).scaled(
-                200, 50, Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            )
-            self.logo_label.setPixmap(pixmap)
-            self.logo_label.setAlignment(
-                Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignTop
-            )
-        main_layout.addWidget(self.logo_label, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        # Spacer between logo and grid
-        spacer_logo = QWidget()
-        spacer_logo.setFixedHeight(20)
-        main_layout.addWidget(spacer_logo)
-
-        # Grid container with semi-transparent background
-        self.grid_widget = QWidget()
-        self.grid_layout = QGridLayout()
-        self.grid_widget.setLayout(self.grid_layout)
-        self.grid_widget.setStyleSheet(
-            "background-color: rgba(0,0,0,120); border-radius: 10px;"
-        )
-        main_layout.addWidget(self.grid_widget, alignment=Qt.AlignmentFlag.AlignHCenter)
-
-        # Checkboxes
-        for i in range(ROWS):
-            for j in range(COLUMNS):
-                cb = QCheckBox("")
-                cb.setStyleSheet("color: lightgrey; font-size: 22px; padding: 20px;")
-                cb.stateChanged.connect(self.checkbox_clicked)
-                self.grid_layout.addWidget(cb, i, j)
-                self.checkboxes.append(cb)
-
-        # Pagination buttons
-        pagination_layout = QHBoxLayout()
-        self.prev_button = QPushButton("Previous")
-        self.prev_button.setFixedSize(100, 35)
         self.prev_button.clicked.connect(self.prev_page)
-        self.next_button = QPushButton("Next")
-        self.next_button.setFixedSize(100, 35)
         self.next_button.clicked.connect(self.next_page)
-        pagination_layout.addWidget(self.prev_button)
-        pagination_layout.addWidget(self.next_button)
-        main_layout.addLayout(pagination_layout)
+        nav_layout.addWidget(self.prev_button, 0, 0)
+        nav_layout.addWidget(self.next_button, 0, 1)
+        layout.addLayout(nav_layout)
 
-        # Spacer at bottom
-        main_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-        self.update_checkboxes()
+        self.update_grid()
 
-    # ---------------------- Checkbox click ----------------------
-    def checkbox_clicked(self):
-        cb = self.sender()
-        if cb.text():
-            QApplication.clipboard().setText(cb.text())
-            QToolTip.showText(cb.mapToGlobal(cb.rect().center()), "Copied!", cb)
-            QTimer.singleShot(1000, QToolTip.hideText)
+        # --- Simulated card reading (for demo) ---
+        self.timer = QTimer()
+        self.timer.timeout.connect(self.simulate_card)
+        self.timer.start(5000)
 
-    # ---------------------- Logging ----------------------
-    def log_message(self, text):
-        print(text)
+        # --- Animations ---
+        self.apply_fade_in_animations()
 
-    # ---------------------- UID helpers ----------------------
-    def uid_to_string(self, uid):
-        return ''.join(format(i, '02X') for i in uid)
+    # ===================================================
+    #                 ANIMATIONS
+    # ===================================================
+    def apply_fade_in_animations(self):
+        # Logo fade
+        self.logo_effect = QGraphicsOpacityEffect()
+        self.logo.setGraphicsEffect(self.logo_effect)
+        logo_anim = QPropertyAnimation(self.logo_effect, b"opacity")
+        logo_anim.setDuration(1000)
+        logo_anim.setStartValue(0)
+        logo_anim.setEndValue(1)
 
-    # ---------------------- Card reading ----------------------
-    def check_card(self):
-        if not LIB_AVAILABLE:
-            return
+        # Grid fade
+        self.grid_effect = QGraphicsOpacityEffect()
+        self.grid_container.setGraphicsEffect(self.grid_effect)
+        grid_anim = QPropertyAnimation(self.grid_effect, b"opacity")
+        grid_anim.setDuration(1000)
+        grid_anim.setStartValue(0)
+        grid_anim.setEndValue(1)
 
-        status, tag_type = self.reader.MFRC522_Request(self.reader.PICC_REQIDL)
-        if status == self.reader.MI_OK:
-            status, uid = self.reader.MFRC522_SelectTagSN()
-            if status == self.reader.MI_OK:
-                uid_str = self.uid_to_string(uid)
-                if uid_str not in self.cards:
-                    self.cards.append(uid_str)
-                    self.save_cards()
-                self.animations[uid_str] = ANIMATION_STEPS
-                self.goto_page_for_uid(uid_str)
+        # Sequential fade: logo then grid
+        seq = QSequentialAnimationGroup()
+        seq.addAnimation(logo_anim)
+        seq.addAnimation(grid_anim)
+        seq.start()
 
-    # ---------------------- Pagination & display ----------------------
-    def goto_page_for_uid(self, uid_str):
-        index = self.cards.index(uid_str)
-        new_page = index // CARDS_PER_PAGE
-        if new_page != self.page:
-            self.page = new_page
-        self.update_checkboxes(uid_str)
+    # ===================================================
+    #               CARD SIMULATION
+    # ===================================================
+    def simulate_card(self):
+        uid = f"UID-{random.randint(10000, 99999)}"
+        if uid not in self.cards:
+            self.cards.append(uid)
+            self.save_cards()
+        self.highlight_uid(uid)
 
-    def update_checkboxes(self, highlight_uid=None):
-        total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
-        self.page = min(self.page, total_pages - 1)
+    def highlight_uid(self, uid):
+        total = len(self.cards)
+        page = total // self.uids_per_page
+        self.current_page = page
+        self.update_grid()
 
-        start_index = self.page * CARDS_PER_PAGE
-        end_index = start_index + CARDS_PER_PAGE
-        page_cards = self.cards[start_index:end_index]
+        index = self.cards.index(uid) % self.uids_per_page
+        if 0 <= index < len(self.uid_buttons):
+            btn = self.uid_buttons[index]
+            btn.setChecked(True)
+            btn.setStyleSheet(btn.styleSheet().replace("lightgray", "white"))
 
-        for i, cb in enumerate(self.checkboxes):
+    # ===================================================
+    #                 PAGE NAVIGATION
+    # ===================================================
+    def update_grid(self):
+        start = self.current_page * self.uids_per_page
+        end = start + self.uids_per_page
+        page_cards = self.cards[start:end]
+
+        for i, btn in enumerate(self.uid_buttons):
             if i < len(page_cards):
-                cb.setText(page_cards[i])
-                cb.setChecked(False)
-                cb.setEnabled(True)
+                btn.setText(page_cards[i])
+                btn.setChecked(False)
+                btn.setStyleSheet("""
+                    QPushButton {
+                        background-color: rgba(255,255,255,100);
+                        color: lightgray;
+                        border: 1px solid gray;
+                        border-radius: 6px;
+                        padding: 8px;
+                        font-size: 14px;
+                    }
+                    QPushButton:checked {
+                        background-color: rgba(0,255,0,80);
+                        color: white;
+                    }
+                """)
             else:
-                cb.setText("")
-                cb.setChecked(False)
-                cb.setEnabled(False)
+                btn.setText("Empty")
+                btn.setChecked(False)
 
-        if highlight_uid and highlight_uid not in page_cards:
-            self.goto_page_for_uid(highlight_uid)
-
-    def update_animation(self):
-        for cb in self.checkboxes:
-            uid = cb.text()
-            if uid in self.animations and self.animations[uid] > 0:
-                step = self.animations[uid]
-                green_value = int(255 * step / ANIMATION_STEPS)
-                cb.setStyleSheet(
-                    f"color: rgb(0,{green_value},0); font-size: 22px; padding: 20px;"
-                )
-                self.animations[uid] -= 1
-            elif uid in self.animations and self.animations[uid] <= 0:
-                cb.setStyleSheet("color: lightgrey; font-size: 22px; padding: 20px;")
-                del self.animations[uid]
-
-    # ---------------------- Pagination ----------------------
     def next_page(self):
-        total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
-        self.page = (self.page + 1) % total_pages
-        self.update_checkboxes()
+        if (self.current_page + 1) * self.uids_per_page < len(self.cards):
+            self.current_page += 1
+            self.update_grid()
 
     def prev_page(self):
-        total_pages = max(1, (len(self.cards) + CARDS_PER_PAGE - 1) // CARDS_PER_PAGE)
-        self.page = (self.page - 1 + total_pages) % total_pages
-        self.update_checkboxes()
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.update_grid()
 
-    # ---------------------- Save/load cards ----------------------
+    # ===================================================
+    #                   CLIPBOARD
+    # ===================================================
+    def copy_uid(self, button):
+        uid = button.text()
+        if uid and uid != "Empty":
+            clipboard: QClipboard = QGuiApplication.clipboard()
+            clipboard.setText(uid)
+            button.setStyleSheet(button.styleSheet().replace("rgba(255,255,255,100)", "rgba(0,255,0,80)"))
+            print(f"Copied UID: {uid}")
+
+    # ===================================================
+    #                   SAVE / LOAD
+    # ===================================================
     def save_cards(self):
-        try:
-            with open(CARDS_FILE, "w") as f:
-                json.dump(self.cards, f)
-        except Exception as e:
-            self.log_message(f"Error saving cards: {e}")
+        with open(CARDS_FILE, "w") as f:
+            json.dump(self.cards, f, indent=4)
 
     def load_cards(self):
         if os.path.exists(CARDS_FILE):
-            try:
-                with open(CARDS_FILE, "r") as f:
-                    self.cards = json.load(f)
-            except Exception as e:
-                self.log_message(f"Error loading cards: {e}")
-                self.cards = []
+            with open(CARDS_FILE, "r") as f:
+                return json.load(f)
+        return []
+
+# ===================================================
+#                    MAIN
+# ===================================================
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = RFIDPlugin()
+    window.show()
+    sys.exit(app.exec())
