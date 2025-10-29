@@ -1,0 +1,34 @@
+{
+  "images_dir": "oLed/rebecca/faces_rebecca",
+
+  "states": {
+    "LOOK_AROUND": {
+      "type": "idle_animation",
+      "frames": ["LOOK_L.png", "LOOK_R.png", "LOOK_L_HAPPY.png", "LOOK_R_HAPPY.png"],
+      "happy_chance": 0.2,
+      "min_delay": 1.5,
+      "max_delay": 4.5
+    },
+    "SLEEP": {"type": "static_cycle", "frames": ["SLEEP.png", "SLEEP2.png"], "delay": 2.0},
+    "EXCITED": {"type": "static", "frame": "EXCITED.png", "delay": 4.0},
+    "COOL": {"type": "static", "frame": "COOL.png", "delay": 3.0},
+    "SAD": {"type": "static", "frame": "SAD.png", "delay": 4.0},
+    "INTENSE": {"type": "static", "frame": "INTENSE.png", "delay": 3.0},
+    "HAPPY": {"type": "static", "frame": "HAPPY.png", "delay": 2.0},
+    "LEVELUP": {"type": "static", "frame": "LEVELUP.png", "delay": 1.0}
+  },
+
+  "event_map": {
+    "screensaver_on": "SLEEP",
+    "screensaver_off": "INTENSE",
+    "rfid_scan": "COOL",
+    "idle_long": "SAD",
+    "user_return": "HAPPY"
+  },
+
+  "leveling": {
+    "xp_per_minute_running": 1,
+    "xp_for_rfid": 10,
+    "levels": [0, 50, 150, 350, 700, 1200]
+  }
+}
