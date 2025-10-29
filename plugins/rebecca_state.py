@@ -74,6 +74,16 @@ class Rebecca(threading.Thread):
             self.add_xp(1)
         self.last_input = time.time()
 
+    # 🆕 helper to handle return to idle
+    def maybe_return_to_idle(self, sconf, state_name):
+        if "return_to_idle_after" in sconf:
+            end_time = time.time() + sconf["return_to_idle_after"]
+            while time.time() < end_time and self.state == state_name:
+                time.sleep(0.1)
+            if self.state == state_name:
+                print(f"⏳ Returning to LOOK_AROUND from {state_name}")
+                self.state = "LOOK_AROUND"
+
     def run(self):
         while self.running:
             # passive XP per minute
@@ -87,6 +97,7 @@ class Rebecca(threading.Thread):
 
             sconf = self.cfg["states"][self.state]
             t = sconf["type"]
+            state_name = self.state  # 🆕 store once for reference
 
             if t == "idle_animation":
                 frames = sconf["frames"]
@@ -97,26 +108,26 @@ class Rebecca(threading.Thread):
                 img = self.display.load(f)
                 self.display.show(img)
                 time.sleep(random.uniform(sconf["min_delay"], sconf["max_delay"]))
+                self.maybe_return_to_idle(sconf, state_name)  # 🆕 added
 
             elif t == "static":
                 img = self.display.load(sconf["frame"])
                 self.display.show(img)
                 time.sleep(sconf.get("delay",2.0))
+                self.maybe_return_to_idle(sconf, state_name)  # 🆕 added
 
             elif t == "static_cycle":
-                state_name = self.state  # <— store current state name
                 while self.state == state_name:
                     for f in sconf["frames"]:
-                        # Break early if state changed by an event
                         if self.state != state_name:
                             break
                         img = self.display.load(f)
                         self.display.show(img)
                         time.sleep(sconf.get("delay", 2.0))
+                    self.maybe_return_to_idle(sconf, state_name)  # 🆕 added
 
             else:
                 time.sleep(0.1)
-                state_name = self.state
 
 # ---------------- socket listener ----------
 class EventListener(threading.Thread):
