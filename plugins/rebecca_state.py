@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
-import json, time, random, threading
+import json, time, random, threading, socket, os, select
 from pathlib import Path
 from demo_opts import get_device
 from PIL import Image
 
 CONFIG_PATH = Path(__file__).with_name("rebecca.json")
 XP_STORE = Path(__file__).with_name("rebecca_xp.json")
+SOCKET_PATH = "/tmp/rebecca.sock"
 
 # ---------------- helpers -----------------
 def load_json(p, default):
     if p.exists():
         return json.loads(p.read_text())
     return default
+
 def save_json(p, data):
     p.write_text(json.dumps(data, indent=2))
 
@@ -52,12 +54,12 @@ class Rebecca(threading.Thread):
         self.xpdata["xp"] += n
         lvls = self.cfg["leveling"]["levels"]
         lvl = self.xpdata["level"]
-        for i,t in enumerate(lvls):
+        for i, t in enumerate(lvls):
             if self.xpdata["xp"] >= t:
                 lvl = i
         if lvl > self.xpdata["level"]:
             self.xpdata["level"] = lvl
-            print(f"LEVEL UP! {lvl}")
+            print(f"🎉 LEVEL UP! {lvl}")
             self.state = "LEVELUP"
         save_json(XP_STORE, self.xpdata)
 
@@ -65,9 +67,10 @@ class Rebecca(threading.Thread):
         emap = self.cfg["event_map"]
         if name in emap:
             self.state = emap[name]
+            print(f"Event: {name} → {self.state}")
         if name == "rfid_scan":
             self.add_xp(self.cfg["leveling"]["xp_for_rfid"])
-        if name in ("user_return","screensaver_off"):
+        if name in ("user_return", "screensaver_off"):
             self.add_xp(1)
         self.last_input = time.time()
 
@@ -105,10 +108,36 @@ class Rebecca(threading.Thread):
                     img = self.display.load(f)
                     self.display.show(img)
                     time.sleep(sconf.get("delay",2.0))
-                self.state = "LOOK_AROUND"  # return to idle after cycle
+                self.state = "LOOK_AROUND"
 
             else:
                 time.sleep(0.1)
+
+# ---------------- socket listener ----------
+class EventListener(threading.Thread):
+    def __init__(self, rebecca):
+        super().__init__(daemon=True)
+        self.rebecca = rebecca
+        self.running = True
+        self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        if os.path.exists(SOCKET_PATH):
+            os.remove(SOCKET_PATH)
+        self.sock.bind(SOCKET_PATH)
+        os.chmod(SOCKET_PATH, 0o666)
+
+    def run(self):
+        print(f"📡 Listening on {SOCKET_PATH}")
+        while self.running:
+            r, _, _ = select.select([self.sock], [], [], 0.5)
+            if self.sock in r:
+                try:
+                    data, _ = self.sock.recvfrom(1024)
+                    msg = json.loads(data.decode().strip())
+                    ev = msg.get("type")
+                    if ev:
+                        self.rebecca.event(ev)
+                except Exception as e:
+                    print("socket error:", e)
 
 # ---------------- main --------------------
 if __name__ == "__main__":
@@ -117,12 +146,15 @@ if __name__ == "__main__":
     r = Rebecca(device, cfg)
     r.start()
 
-    print("Rebecca running — type events (or Ctrl+C to exit):")
+    listener = EventListener(r)
+    listener.start()
+
+    print("Rebecca running — send JSON events to /tmp/rebecca.sock")
+    print('Example: echo \'{"type":"rfid_scan"}\' | socat - UNIX-SENDTO:/tmp/rebecca.sock')
     try:
         while True:
-            ev = input("> ").strip()
-            if ev:
-                r.event(ev)
+            time.sleep(1)
     except KeyboardInterrupt:
         r.running = False
+        listener.running = False
         print("Bye.")
