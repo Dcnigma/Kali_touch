@@ -201,8 +201,8 @@ class ImageEditorDialog(QDialog):
         layout.addWidget(self.image_label, 1)
 
         # connect signals for click/double-click
-        self.image_label.clicked.connect(self.on_image_click)
-        self.image_label.doubleClicked.connect(self.on_image_double_click)
+        #self.image_label.clicked.connect(self.on_image_click)
+        #self.image_label.doubleClicked.connect(self.on_image_double_click)
 
         # wheel resets hide timer
         def _wheel(ev):
