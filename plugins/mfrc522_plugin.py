@@ -2,6 +2,7 @@
 import os
 import sys
 import json
+import socket
 from datetime import datetime
 from PyQt6.QtWidgets import (
     QWidget, QLabel, QCheckBox, QPushButton, QVBoxLayout, QHBoxLayout,
@@ -196,6 +197,9 @@ class MFRC522Plugin(QWidget):
                 self.animations[uid_str] = ANIMATION_STEPS
                 self.goto_page_for_uid(uid_str)
                 self.update_last_scan_label()
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+                sock.sendto(json.dumps({"type":"rfid_scan"}).encode(), "/tmp/rebecca.sock")
+                sock.close()
 
     # ---------------------- Pagination & display ----------------------
     def goto_page_for_uid(self, uid_str):
