@@ -28,7 +28,9 @@
     "rfid_scan": "COOL",
     "idle_long": "SAD",
     "user_return": "HAPPY",
+    "user_good": "EXCITED",
     "look_around": "LOOK_AROUND"
+    
   },
 
   "leveling": {
