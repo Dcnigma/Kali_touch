@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 import json, time, random, threading, socket, os, select
+import subprocess  #  for xprintidle
+
 from pathlib import Path
 from demo_opts import get_device
 from PIL import Image
@@ -174,6 +176,28 @@ class EventListener(threading.Thread):
                 except Exception as e:
                     print("socket error:", e)
 
+# ---------------- screensaver monitor  -----------------
+def screensaver_monitor(rebecca, threshold_ms=300000, check_interval=5):
+    """
+    Monitors user idle time using xprintidle.
+    Sends events to Rebecca: screensaver_on/off
+    """
+    active = True
+    while True:
+        try:
+            idle_ms = int(subprocess.check_output(["xprintidle"]))
+            if idle_ms > threshold_ms and active:
+                rebecca.event("screensaver_on")
+                active = False
+            elif idle_ms <= threshold_ms and not active:
+                rebecca.event("screensaver_off")
+                active = True
+        except Exception as e:
+            print("Screensaver monitor error:", e)
+        time.sleep(check_interval)
+
+
+
 # ---------------- main --------------------
 if __name__ == "__main__":
     cfg = load_json(CONFIG_PATH, {})
@@ -184,6 +208,9 @@ if __name__ == "__main__":
     listener = EventListener(r)
     listener.start()
 
+    # 🆕 start screensaver detection thread
+    threading.Thread(target=screensaver_monitor, args=(r,), daemon=True).start()    
+    
     print("Rebecca running — send JSON events to /tmp/rebecca.sock")
     print('Example: echo \'{"type":"rfid_scan"}\' | socat - UNIX-SENDTO:/tmp/rebecca.sock')
     try:
