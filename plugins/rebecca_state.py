@@ -49,6 +49,14 @@ class Rebecca(threading.Thread):
         self.xpdata = load_json(XP_STORE, {"xp":0,"level":0})
         self.last_xp_tick = time.time()
         self.last_input = time.time()
+        self.state_start = time.time()   # track how long in current state
+
+    def set_state(self, new_state):
+        """Helper to switch state and record start time"""
+        if new_state != self.state:
+            self.state = new_state
+            self.state_start = time.time()
+            print(f"State → {new_state}")
 
     def add_xp(self, n):
         self.xpdata["xp"] += n
@@ -66,7 +74,7 @@ class Rebecca(threading.Thread):
     def event(self, name):
         emap = self.cfg["event_map"]
         if name in emap:
-            self.state = emap[name]
+            self.set_state(emap[name])
             print(f"Event: {name} → {self.state}")
         if name == "rfid_scan":
             self.add_xp(self.cfg["leveling"]["xp_for_rfid"])
@@ -86,45 +94,56 @@ class Rebecca(threading.Thread):
 
     def run(self):
         while self.running:
-            # passive XP per minute
+            # passive XP
             if time.time() - self.last_xp_tick > 60:
                 self.add_xp(self.cfg["leveling"]["xp_per_minute_running"])
                 self.last_xp_tick = time.time()
 
-            # idle detection
-            if time.time() - self.last_input > 60*5:
-                self.state = self.cfg["event_map"].get("idle_long","SAD")
+            # idle timeout
+            if time.time() - self.last_input > 60 * 5:
+                self.set_state(self.cfg["event_map"].get("idle_long", "SAD"))
 
             sconf = self.cfg["states"][self.state]
             t = sconf["type"]
-            state_name = self.state  # 🆕 store once for reference
+
+            # ---- return-to-idle check ----
+            rti = sconf.get("return_to_idle_after")
+            if rti and time.time() - self.state_start > rti:
+                self.set_state("LOOK_AROUND")
+                continue
 
             if t == "idle_animation":
                 frames = sconf["frames"]
                 f = random.choice(frames)
-                if random.random() < sconf.get("happy_chance",0.2):
+                if random.random() < sconf.get("happy_chance", 0.2):
                     happy = [x for x in frames if "HAPPY" in x]
                     if happy: f = random.choice(happy)
                 img = self.display.load(f)
                 self.display.show(img)
                 time.sleep(random.uniform(sconf["min_delay"], sconf["max_delay"]))
-                self.maybe_return_to_idle(sconf, state_name)  # 🆕 added
 
             elif t == "static":
                 img = self.display.load(sconf["frame"])
                 self.display.show(img)
-                time.sleep(sconf.get("delay",2.0))
-                self.maybe_return_to_idle(sconf, state_name)  # 🆕 added
+                time.sleep(sconf.get("delay", 2.0))
 
             elif t == "static_cycle":
+                state_name = self.state
+                delay = sconf.get("delay", 2.0)
                 while self.state == state_name:
                     for f in sconf["frames"]:
+                        # break if state changed
                         if self.state != state_name:
+                            break
+                        # check return-to-idle timer
+                        rti = sconf.get("return_to_idle_after")
+                        if rti and time.time() - self.state_start > rti:
+                            self.set_state("LOOK_AROUND")
                             break
                         img = self.display.load(f)
                         self.display.show(img)
-                        time.sleep(sconf.get("delay", 2.0))
-                    self.maybe_return_to_idle(sconf, state_name)  # 🆕 added
+                        time.sleep(delay)
+                    time.sleep(0.05)
 
             else:
                 time.sleep(0.1)
