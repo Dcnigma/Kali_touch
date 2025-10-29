@@ -104,6 +104,7 @@ class Rebecca(threading.Thread):
                 time.sleep(sconf.get("delay",2.0))
 
             elif t == "static_cycle":
+                state_name = self.state  # <— store current state name
                 while self.state == state_name:
                     for f in sconf["frames"]:
                         # Break early if state changed by an event
@@ -115,6 +116,7 @@ class Rebecca(threading.Thread):
 
             else:
                 time.sleep(0.1)
+                state_name = self.state
 
 # ---------------- socket listener ----------
 class EventListener(threading.Thread):
