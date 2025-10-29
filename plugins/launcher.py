@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import sys
 import os
+import grp
 import json
 import subprocess
 import signal
@@ -15,6 +16,18 @@ from PyQt6.QtGui import QPixmap, QIcon
 
 CONFIG_FILE = "apps.json"
 SCREEN_W, SCREEN_H = 1024, 800
+
+# Ensure current process has access to gpio and spi
+def add_hardware_groups():
+    try:
+        # get GIDs for groups
+        gpio_gid = grp.getgrnam('gpio').gr_gid
+        spi_gid = grp.getgrnam('spi').gr_gid
+        os.setgroups([gpio_gid, spi_gid])
+    except Exception as e:
+        print("Warning: Could not add gpio/spi groups:", e)
+
+add_hardware_groups()
 
 # Load apps from JSON
 with open(CONFIG_FILE, "r") as f:
