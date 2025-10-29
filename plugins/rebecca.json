@@ -38,7 +38,7 @@
     "UPLOAD": {
       "type": "static_cycle",
       "frames": ["UPLOAD.png", "UPLOAD1.png", "UPLOAD2.png"],
-      "delay": 1.0,
+      "delay": 0.3,
       "return_to_idle_after": 10
     }
   },
