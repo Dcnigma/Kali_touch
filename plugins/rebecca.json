@@ -9,13 +9,17 @@
       "min_delay": 1.5,
       "max_delay": 4.5
     },
-    "SLEEP": {"type": "static_cycle", "frames": ["SLEEP.png", "SLEEP2.png"], "delay": 2.0},
-    "EXCITED": {"type": "static", "frame": "EXCITED.png", "delay": 4.0},
-    "COOL": {"type": "static", "frame": "COOL.png", "delay": 3.0},
-    "SAD": {"type": "static", "frame": "SAD.png", "delay": 4.0},
-    "INTENSE": {"type": "static", "frame": "INTENSE.png", "delay": 3.0},
-    "HAPPY": {"type": "static", "frame": "HAPPY.png", "delay": 2.0},
-    "LEVELUP": {"type": "static", "frame": "LEVELUP.png", "delay": 1.0}
+    "SLEEP": {
+      "type": "static_cycle",
+      "frames": ["SLEEP.png", "SLEEP2.png"],
+      "delay": 2.0
+    },
+    "EXCITED": { "type": "static", "frame": "EXCITED.png", "delay": 4.0 },
+    "COOL": { "type": "static", "frame": "COOL.png", "delay": 3.0 },
+    "SAD": { "type": "static", "frame": "SAD.png", "delay": 4.0 },
+    "INTENSE": { "type": "static", "frame": "INTENSE.png", "delay": 3.0 },
+    "HAPPY": { "type": "static", "frame": "HAPPY.png", "delay": 2.0 },
+    "LEVELUP": { "type": "static", "frame": "LEVELUP.png", "delay": 1.0 }
   },
 
   "event_map": {
@@ -23,7 +27,8 @@
     "screensaver_off": "INTENSE",
     "rfid_scan": "COOL",
     "idle_long": "SAD",
-    "user_return": "HAPPY"
+    "user_return": "HAPPY",
+    "look_around": "LOOK_AROUND"
   },
 
   "leveling": {
