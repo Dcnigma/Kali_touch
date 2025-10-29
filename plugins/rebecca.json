@@ -70,5 +70,10 @@
     "xp_per_minute_running": 1,
     "xp_for_rfid": 10,
     "levels": [0, 50, 150, 350, 700, 1200]
-  }
+  },
+  "idle_thresholds": {
+  "short_idle": 30000,       // 30 sec
+  "long_idle": 300000,       // 5 min
+  "screensaver_idle": 600000 // 10 min
+}
 }
