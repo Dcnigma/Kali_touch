@@ -1,5 +1,5 @@
 #!/bin/bash
 # Activate virtual environment
-source /Users/dcnigma/Downloads/Overlay/Overlay_env/bin/activate 
+source /home/kali/overlay_launcher/venv/bin/activate
 # Run launcher
-python3 /Users/dcnigma/Downloads/Overlay/launcher.py 
+python3 /home/kali/overlay_launcher/launcher.py
