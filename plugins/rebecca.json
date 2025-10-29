@@ -72,8 +72,8 @@
     "levels": [0, 50, 150, 350, 700, 1200]
   },
   "idle_thresholds": {
-  "short_idle": 30000,       # 30 sec
-  "long_idle": 300000,       # 5 min
-  "screensaver_idle": 600000 # 10 min
+  "short_idle": 30000,       
+  "long_idle": 300000,       
+  "screensaver_idle": 600000 
 }
 }
