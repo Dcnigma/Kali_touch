@@ -16,29 +16,30 @@
       "delay": 2.0
     },
 
-    "EXCITED": { "type": "static", "frame": "EXCITED.png", "delay": 4.0 },
-    "COOL": { "type": "static", "frame": "COOL.png", "delay": 3.0 },
-    "SAD": { "type": "static", "frame": "SAD.png", "delay": 4.0 },
-    "INTENSE": { "type": "static", "frame": "INTENSE.png", "delay": 3.0 },
-    "HAPPY": { "type": "static", "frame": "HAPPY.png", "delay": 2.0 },
-    "LEVELUP": { "type": "static", "frame": "LEVELUP.png", "delay": 1.0 },
+    "EXCITED": { "type": "static", "frame": "EXCITED.png", "delay": 4.0, "return_to_idle_after": 6 },
+    "COOL": { "type": "static", "frame": "COOL.png", "delay": 3.0, "return_to_idle_after": 5 },
+    "SAD": { "type": "static", "frame": "SAD.png", "delay": 4.0, "return_to_idle_after": 8 },
+    "INTENSE": { "type": "static", "frame": "INTENSE.png", "delay": 3.0, "return_to_idle_after": 5 },
+    "HAPPY": { "type": "static", "frame": "HAPPY.png", "delay": 2.0, "return_to_idle_after": 5 },
+    "LEVELUP": { "type": "static", "frame": "LEVELUP.png", "delay": 1.0, "return_to_idle_after": 4 },
 
-    "ANGRY": { "type": "static", "frame": "ANGRY.png", "delay": 3.0 },
-    "AWAKE": { "type": "static", "frame": "AWAKE.png", "delay": 2.5 },
-    "BORED": { "type": "static", "frame": "BORED.png", "delay": 3.0 },
+    "ANGRY": { "type": "static", "frame": "ANGRY.png", "delay": 3.0, "return_to_idle_after": 6 },
+    "AWAKE": { "type": "static", "frame": "AWAKE.png", "delay": 2.5, "return_to_idle_after": 4 },
+    "BORED": { "type": "static", "frame": "BORED.png", "delay": 3.0, "return_to_idle_after": 6 },
     "BROKEN": { "type": "static", "frame": "BROKEN.png", "delay": 4.0 },
     "DEBUG": { "type": "static", "frame": "DEBUG.png", "delay": 4.0 },
-    "DEMOTIVATED": { "type": "static", "frame": "DEMOTIVATED.png", "delay": 4.0 },
-    "FRIEND": { "type": "static", "frame": "FRIEND.png", "delay": 3.0 },
-    "GRATEFUL": { "type": "static", "frame": "GRATEFUL.png", "delay": 3.0 },
-    "LONELY": { "type": "static", "frame": "LONELY.png", "delay": 4.0 },
-    "MOTIVATED": { "type": "static", "frame": "MOTIVATED.png", "delay": 3.0 },
-    "SMART": { "type": "static", "frame": "SMART.png", "delay": 3.0 },
+    "DEMOTIVATED": { "type": "static", "frame": "DEMOTIVATED.png", "delay": 4.0, "return_to_idle_after": 8 },
+    "FRIEND": { "type": "static", "frame": "FRIEND.png", "delay": 3.0, "return_to_idle_after": 5 },
+    "GRATEFUL": { "type": "static", "frame": "GRATEFUL.png", "delay": 3.0, "return_to_idle_after": 6 },
+    "LONELY": { "type": "static", "frame": "LONELY.png", "delay": 4.0, "return_to_idle_after": 8 },
+    "MOTIVATED": { "type": "static", "frame": "MOTIVATED.png", "delay": 3.0, "return_to_idle_after": 5 },
+    "SMART": { "type": "static", "frame": "SMART.png", "delay": 3.0, "return_to_idle_after": 5 },
 
     "UPLOAD": {
       "type": "static_cycle",
       "frames": ["UPLOAD.png", "UPLOAD1.png", "UPLOAD2.png"],
-      "delay": 0.8
+      "delay": 0.8,
+      "return_to_idle_after": 5
     }
   },
 
