@@ -294,7 +294,7 @@ class ImageEditorDialog(QDialog):
         for L in self.layers:
             if L.get("id") == lid:
              return L
-    return None
+        return None
 
     def _get_layer_at(self, img_x, img_y):
         # top-most hit test, using textbbox for text layers
