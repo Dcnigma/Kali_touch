@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-import json, time, random, threading, socket, os, select
-import subprocess  #  for xprintidle
-
+import json, time, random, threading, socket, os, select, subprocess
 from pathlib import Path
 from demo_opts import get_device
 from PIL import Image
@@ -51,10 +49,10 @@ class Rebecca(threading.Thread):
         self.xpdata = load_json(XP_STORE, {"xp":0,"level":0})
         self.last_xp_tick = time.time()
         self.last_input = time.time()
-        self.state_start = time.time()   # track how long in current state
+        self.state_start = time.time()  # track state start
 
     def set_state(self, new_state):
-        """Helper to switch state and record start time"""
+        """Switch state and store start time"""
         if new_state != self.state:
             self.state = new_state
             self.state_start = time.time()
@@ -70,7 +68,7 @@ class Rebecca(threading.Thread):
         if lvl > self.xpdata["level"]:
             self.xpdata["level"] = lvl
             print(f"🎉 LEVEL UP! {lvl}")
-            self.state = "LEVELUP"
+            self.set_state("LEVELUP")
         save_json(XP_STORE, self.xpdata)
 
     def event(self, name):
@@ -84,16 +82,7 @@ class Rebecca(threading.Thread):
             self.add_xp(1)
         self.last_input = time.time()
 
-    # 🆕 helper to handle return to idle
-    def maybe_return_to_idle(self, sconf, state_name):
-        if "return_to_idle_after" in sconf:
-            end_time = time.time() + sconf["return_to_idle_after"]
-            while time.time() < end_time and self.state == state_name:
-                time.sleep(0.1)
-            if self.state == state_name:
-                print(f"⏳ Returning to LOOK_AROUND from {state_name}")
-                self.state = "LOOK_AROUND"
-
+    # ---------------- run loop -----------------
     def run(self):
         while self.running:
             # passive XP
@@ -101,14 +90,15 @@ class Rebecca(threading.Thread):
                 self.add_xp(self.cfg["leveling"]["xp_per_minute_running"])
                 self.last_xp_tick = time.time()
 
-            # idle timeout
-            if time.time() - self.last_input > 60 * 5:
-                self.set_state(self.cfg["event_map"].get("idle_long", "SAD"))
+            # idle detection: fallback if no monitor
+            if time.time() - self.last_input > 60*5:
+                self.set_state(self.cfg["event_map"].get("idle_long","SAD"))
 
             sconf = self.cfg["states"][self.state]
             t = sconf["type"]
+            state_name = self.state  # store current state
 
-            # ---- return-to-idle check ----
+            # ---- return-to-idle timer ----
             rti = sconf.get("return_to_idle_after")
             if rti and time.time() - self.state_start > rti:
                 self.set_state("LOOK_AROUND")
@@ -127,18 +117,15 @@ class Rebecca(threading.Thread):
             elif t == "static":
                 img = self.display.load(sconf["frame"])
                 self.display.show(img)
-                time.sleep(sconf.get("delay", 2.0))
+                time.sleep(sconf.get("delay",2.0))
 
             elif t == "static_cycle":
-                state_name = self.state
                 delay = sconf.get("delay", 2.0)
                 while self.state == state_name:
                     for f in sconf["frames"]:
-                        # break if state changed
                         if self.state != state_name:
                             break
-                        # check return-to-idle timer
-                        rti = sconf.get("return_to_idle_after")
+                        # check return-to-idle
                         if rti and time.time() - self.state_start > rti:
                             self.set_state("LOOK_AROUND")
                             break
@@ -146,7 +133,6 @@ class Rebecca(threading.Thread):
                         self.display.show(img)
                         time.sleep(delay)
                     time.sleep(0.05)
-
             else:
                 time.sleep(0.1)
 
@@ -176,27 +162,38 @@ class EventListener(threading.Thread):
                 except Exception as e:
                     print("socket error:", e)
 
-# ---------------- screensaver monitor  -----------------
-def screensaver_monitor(rebecca, threshold_ms=300000, check_interval=5):
+# ---------------- idle/screensaver monitor 🆕 -----------------
+def idle_monitor(rebecca, check_interval=5):
     """
-    Monitors user idle time using xprintidle.
-    Sends events to Rebecca: screensaver_on/off
+    Multi-level idle detection using xprintidle.
     """
     active = True
+    thresholds = rebecca.cfg.get("idle_thresholds", {})
+    short_idle = thresholds.get("short_idle", 30000)
+    long_idle = thresholds.get("long_idle", 300000)
+    screensaver_idle = thresholds.get("screensaver_idle", 600000)
+
     while True:
         try:
             idle_ms = int(subprocess.check_output(["xprintidle"]))
-            if idle_ms > threshold_ms and active:
+            # screensaver / very long idle
+            if idle_ms >= screensaver_idle:
                 rebecca.event("screensaver_on")
-                active = False
-            elif idle_ms <= threshold_ms and not active:
+            # long idle
+            elif idle_ms >= long_idle:
+                rebecca.event("idle_long")
+            # short idle
+            elif idle_ms >= short_idle:
+                rebecca.event("look_around")
+            # user returned
+            if idle_ms < short_idle and not active:
                 rebecca.event("screensaver_off")
                 active = True
+            elif idle_ms >= short_idle:
+                active = False
         except Exception as e:
-            print("Screensaver monitor error:", e)
+            print("Idle monitor error:", e)
         time.sleep(check_interval)
-
-
 
 # ---------------- main --------------------
 if __name__ == "__main__":
@@ -208,9 +205,9 @@ if __name__ == "__main__":
     listener = EventListener(r)
     listener.start()
 
-    # 🆕 start screensaver detection thread
-    threading.Thread(target=screensaver_monitor, args=(r,), daemon=True).start()    
-    
+    # 🆕 start idle/screensaver monitoring
+    threading.Thread(target=idle_monitor, args=(r,), daemon=True).start()
+
     print("Rebecca running — send JSON events to /tmp/rebecca.sock")
     print('Example: echo \'{"type":"rfid_scan"}\' | socat - UNIX-SENDTO:/tmp/rebecca.sock')
     try:
