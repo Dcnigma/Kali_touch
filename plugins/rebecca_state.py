@@ -104,11 +104,14 @@ class Rebecca(threading.Thread):
                 time.sleep(sconf.get("delay",2.0))
 
             elif t == "static_cycle":
-                for f in sconf["frames"]:
-                    img = self.display.load(f)
-                    self.display.show(img)
-                    time.sleep(sconf.get("delay",2.0))
-                self.state = "LOOK_AROUND"
+                while self.state == state_name:
+                    for f in sconf["frames"]:
+                        # Break early if state changed by an event
+                        if self.state != state_name:
+                            break
+                        img = self.display.load(f)
+                        self.display.show(img)
+                        time.sleep(sconf.get("delay", 2.0))
 
             else:
                 time.sleep(0.1)
