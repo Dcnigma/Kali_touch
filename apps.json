@@ -11,7 +11,7 @@
     "plugin": "plugins.Passport:PassportPlugin",
     "touch_icon": "icons/Textedit.png",
     "x": 0,
-    "y": 0,
+    "y": 0
   },
   "mousepad": {
     "cmd": "mousepad",
