@@ -17,8 +17,8 @@ REBECCA_XP_JSON = os.path.join(plugin_folder, "rebecca_xp.json")
 FACES_DIR = os.path.join(plugin_folder, "oLed", "rebecca", "faces_rebecca")
 
 # Photo frame positions & size
-FRAME_X, FRAME_Y = 255, 264
-FRAME_W, FRAME_H = 364, 437
+FRAME_X, FRAME_Y = 55, 264
+FRAME_W, FRAME_H = 64, 437
 
 # Other positions
 NAME_Y = 97
