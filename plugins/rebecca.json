@@ -71,11 +71,6 @@
     "xp_for_rfid": 10,
     "levels": [0, 50, 150, 350, 700, 1200]
   },
-  
-  "name": {
-  "firstname": Rebecca
-  },
-  
   "idle_thresholds": {
   "short_idle": 30000,       
   "long_idle": 300000,       
