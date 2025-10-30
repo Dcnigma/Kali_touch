@@ -50,18 +50,6 @@ class Rebecca(threading.Thread):
         self.last_xp_tick = time.time()
         self.last_input = time.time()
         self.state_start = time.time()  # track state start
-        self.xpdata = load_json(XP_STORE, {"xp":0, "level":0})
-        
-        # Ensure required keys exist
-        if "mood" not in self.xpdata:
-            self.xpdata["mood"] = "Happy"
-        if "level" not in self.xpdata:
-            self.xpdata["level"] = 0
-        if "xp" not in self.xpdata:
-            self.xpdata["xp"] = 0
-        
-        # Save back in case new keys were added
-        save_json(XP_STORE, self.xpdata)
 
     def set_state(self, new_state):
         """Switch state and store start time"""
