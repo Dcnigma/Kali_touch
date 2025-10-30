@@ -31,7 +31,7 @@ PROGRESS_W, PROGRESS_H = 492, 58
 LEVELS = [0, 50, 150, 350, 700, 1200]
 
 
-class RebeccaPlugin(QWidget):
+class PassportPlugin(QWidget):
     def __init__(self):
         super().__init__()
 
