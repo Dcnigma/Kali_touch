@@ -32,7 +32,7 @@ from PyQt6.QtCore import Qt, QSize, pyqtSignal, QTimer, QPoint
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
 PHOTO_FOLDER = os.path.join(plugin_folder, "/home/kali/Pictures/SavedPictures")
 
-THUMBNAIL_SIZE = (180, 120)
+THUMBNAIL_SIZE = (200, 140)
 WINDOW_WIDTH = 1015
 WINDOW_HEIGHT = 550
 SUPPORTED_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".gif")
