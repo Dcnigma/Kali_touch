@@ -10,43 +10,22 @@ SOCKET_PATH = "/tmp/rebecca.sock"
 
 # ---------------- helpers -----------------
 def load_json(p, default):
-    """Load JSON from file; return default if file missing or invalid."""
     if p.exists():
         try:
             return json.loads(p.read_text())
-        except json.JSONDecodeError as e:
-            print(f"⚠️ Warning: Invalid JSON in {p.name}, using default. Error: {e}")
+        except json.JSONDecodeError:
+            print(f"⚠️ JSON decode error in {p}, using default")
             return default
     return default
 
 def save_json(p, data):
-    """Save JSON to file with indent=2."""
     p.write_text(json.dumps(data, indent=2))
 
-def validate_rebecca_json(data):
-    """Ensure required keys exist in rebecca.json"""
-    changed = False
-    if "name" not in data:
-        data["name"] = {"firstname": "Rebecca"}
-        changed = True
-    if "levels" not in data:
-        data["levels"] = [0, 50, 150, 350, 700, 1200]
-        changed = True
-    return changed, data
-
-def validate_rebecca_xp_json(data):
-    """Ensure required keys exist in rebecca_xp.json"""
-    changed = False
-    if "xp" not in data:
-        data["xp"] = 0
-        changed = True
-    if "level" not in data:
-        data["level"] = 0
-        changed = True
-    if "mood" not in data:
-        data["mood"] = "Happy"
-        changed = True
-    return changed, data
+# Ensure mood key exists in xp store
+xp_data = load_json(XP_STORE, {"xp": 0, "level": 0, "mood": "Happy"})
+if "mood" not in xp_data:
+    xp_data["mood"] = "Happy"
+    save_json(XP_STORE, xp_data)
 
 # ---------------- display -----------------
 class Display:
@@ -73,29 +52,24 @@ class Rebecca(threading.Thread):
     def __init__(self, device, cfg):
         super().__init__(daemon=True)
         self.cfg = cfg
+
+        # fallback for images_dir
+        images_dir = cfg.get("images_dir")
+        if not images_dir:
+            images_dir = os.path.join(os.path.dirname(__file__), "oLed/rebecca/faces_rebecca")
+            print(f"⚠️ 'images_dir' missing in config, using fallback: {images_dir}")
+
         self.device = device
-        self.display = Display(device, cfg["images_dir"])
+        self.display = Display(device, images_dir)
+
         self.state = "LOOK_AROUND"
         self.running = True
+        self.xpdata = load_json(XP_STORE, {"xp":0,"level":0, "mood": "Happy"})
         self.last_xp_tick = time.time()
         self.last_input = time.time()
         self.state_start = time.time()  # track state start
 
-        # ---------------- JSON loading & validation ----------------
-        # rebecca.json
-        self.rebecca_data = load_json(CONFIG_PATH, {})
-        changed, self.rebecca_data = validate_rebecca_json(self.rebecca_data)
-        if changed:
-            save_json(CONFIG_PATH, self.rebecca_data)
-
-        # rebecca_xp.json
-        self.xpdata = load_json(XP_STORE, {"xp":0, "level":0, "mood":"Happy"})
-        changed, self.xpdata = validate_rebecca_xp_json(self.xpdata)
-        if changed:
-            save_json(XP_STORE, self.xpdata)
-
     def set_state(self, new_state):
-        """Switch state and store start time"""
         if new_state != self.state:
             self.state = new_state
             self.state_start = time.time()
@@ -103,42 +77,44 @@ class Rebecca(threading.Thread):
 
     def add_xp(self, n):
         self.xpdata["xp"] += n
-        lvls = self.cfg["leveling"]["levels"]
-        lvl = self.xpdata["level"]
+        lvls = self.cfg.get("leveling", {}).get("levels", [0,50,150,350,700,1200])
+        lvl = self.xpdata.get("level", 0)
         for i, t in enumerate(lvls):
             if self.xpdata["xp"] >= t:
                 lvl = i
-        if lvl > self.xpdata["level"]:
+        if lvl > self.xpdata.get("level", 0):
             self.xpdata["level"] = lvl
             print(f"🎉 LEVEL UP! {lvl}")
             self.set_state("LEVELUP")
         save_json(XP_STORE, self.xpdata)
 
     def event(self, name):
-        emap = self.cfg["event_map"]
+        emap = self.cfg.get("event_map", {})
         if name in emap:
             self.set_state(emap[name])
             print(f"Event: {name} → {self.state}")
         if name == "rfid_scan":
-            self.add_xp(self.cfg["leveling"]["xp_for_rfid"])
+            xp_for_rfid = self.cfg.get("leveling", {}).get("xp_for_rfid", 1)
+            self.add_xp(xp_for_rfid)
         if name in ("user_return", "screensaver_off"):
             self.add_xp(1)
         self.last_input = time.time()
 
-    # ---------------- run loop -----------------
     def run(self):
         while self.running:
             # passive XP
             if time.time() - self.last_xp_tick > 60:
-                self.add_xp(self.cfg["leveling"]["xp_per_minute_running"])
+                xp_per_min = self.cfg.get("leveling", {}).get("xp_per_minute_running", 1)
+                self.add_xp(xp_per_min)
                 self.last_xp_tick = time.time()
 
-            # idle detection
+            # idle detection fallback
             if time.time() - self.last_input > 60*5:
-                self.set_state(self.cfg["event_map"].get("idle_long","SAD"))
+                idle_long_state = self.cfg.get("event_map", {}).get("idle_long","SAD")
+                self.set_state(idle_long_state)
 
-            sconf = self.cfg["states"][self.state]
-            t = sconf["type"]
+            sconf = self.cfg.get("states", {}).get(self.state, {})
+            t = sconf.get("type", "idle_animation")
             state_name = self.state
 
             rti = sconf.get("return_to_idle_after")
@@ -147,24 +123,23 @@ class Rebecca(threading.Thread):
                 continue
 
             if t == "idle_animation":
-                frames = sconf["frames"]
-                f = random.choice(frames)
-                if random.random() < sconf.get("happy_chance", 0.2):
-                    happy = [x for x in frames if "HAPPY" in x]
-                    if happy: f = random.choice(happy)
-                img = self.display.load(f)
-                self.display.show(img)
-                time.sleep(random.uniform(sconf["min_delay"], sconf["max_delay"]))
-
+                frames = sconf.get("frames", [])
+                if frames:
+                    f = random.choice(frames)
+                    if random.random() < sconf.get("happy_chance", 0.2):
+                        happy = [x for x in frames if "HAPPY" in x]
+                        if happy: f = random.choice(happy)
+                    img = self.display.load(f)
+                    self.display.show(img)
+                    time.sleep(random.uniform(sconf.get("min_delay",0.5), sconf.get("max_delay",1.5)))
             elif t == "static":
-                img = self.display.load(sconf["frame"])
+                img = self.display.load(sconf.get("frame"))
                 self.display.show(img)
                 time.sleep(sconf.get("delay",2.0))
-
             elif t == "static_cycle":
                 delay = sconf.get("delay", 2.0)
                 while self.state == state_name:
-                    for f in sconf["frames"]:
+                    for f in sconf.get("frames", []):
                         if self.state != state_name:
                             break
                         if rti and time.time() - self.state_start > rti:
@@ -203,7 +178,7 @@ class EventListener(threading.Thread):
                 except Exception as e:
                     print("socket error:", e)
 
-# ---------------- idle/screensaver monitor -----------------
+# ---------------- idle/screensaver monitor 🆕 -----------------
 def idle_monitor(rebecca, check_interval=5):
     active = True
     thresholds = rebecca.cfg.get("idle_thresholds", {})
@@ -220,7 +195,6 @@ def idle_monitor(rebecca, check_interval=5):
                 rebecca.event("idle_long")
             elif idle_ms >= short_idle:
                 rebecca.event("look_around")
-
             if idle_ms < short_idle and not active:
                 rebecca.event("screensaver_off")
                 active = True
