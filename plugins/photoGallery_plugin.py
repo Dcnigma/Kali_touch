@@ -37,7 +37,7 @@ WINDOW_WIDTH = 1015
 WINDOW_HEIGHT = 550
 SUPPORTED_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".gif")
 TOOLBAR_HIDE_MS = 6000  # 6s
-TOOLBAR_HEIGHT = 90     # reduced by ~20px as requested
+TOOLBAR_HEIGHT = 60     # reduced by ~20px as requested
 HANDLE_SIZE_PX = 14     # corner handle sensitive area in display->image coords threshold
 
 # ---------------- Helpers ----------------
@@ -803,7 +803,7 @@ class PhotoGalleryPlugin(QWidget):
             files = sorted([f for f in os.listdir(PHOTO_FOLDER) if os.path.splitext(f)[1].lower() in SUPPORTED_EXTS])
         except Exception:
             files = []
-        col=0; row=0; cols=4
+        col=0; row=0; cols=3
         for fname in files:
             path = os.path.join(PHOTO_FOLDER, fname)
             try:
