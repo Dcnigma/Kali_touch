@@ -8,6 +8,27 @@ CONFIG_PATH = Path(__file__).with_name("rebecca.json")
 XP_STORE = Path(__file__).with_name("rebecca_xp.json")
 SOCKET_PATH = "/tmp/rebecca.sock"
 
+# ---------------- first-run name setup -----------------
+def ensure_name(cfg_path):
+    cfg_data = load_json(cfg_path, {})
+
+    name_data = cfg_data.get("name", {})
+    if not name_data.get("firstname"):
+        # Check if running interactively
+        if os.isatty(0):  # stdin is a terminal
+            firstname = input("Enter the character's first name: ").strip()
+        else:
+            firstname = "Rebecca"  # default for headless
+
+        if not firstname:
+            firstname = "Rebecca"  # fallback
+
+        cfg_data["name"] = {"firstname": firstname}
+        save_json(cfg_path, cfg_data)
+        print(f"✅ Saved name '{firstname}' to {cfg_path}")
+
+    return cfg_data
+    
 # ---------------- helpers -----------------
 def load_json(p, default):
     if p.exists():
@@ -206,6 +227,7 @@ def idle_monitor(rebecca, check_interval=5):
 
 # ---------------- main --------------------
 if __name__ == "__main__":
+    cfg = ensure_name(CONFIG_PATH)
     cfg = load_json(CONFIG_PATH, {})
     device = get_device()
     r = Rebecca(device, cfg)
