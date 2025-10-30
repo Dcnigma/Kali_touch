@@ -4,10 +4,9 @@ import sys
 import json
 from itertools import cycle
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QPushButton, QVBoxLayout, QApplication,
-    QProgressBar
+    QWidget, QLabel, QPushButton, QApplication, QProgressBar
 )
-from PyQt6.QtGui import QPixmap, QFont
+from PyQt6.QtGui import QPixmap, QFont, QBrush, QPalette
 from PyQt6.QtCore import Qt, QTimer
 
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
@@ -32,8 +31,10 @@ LEVELS = [0, 50, 150, 350, 700, 1200]
 
 
 class PassportPlugin(QWidget):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None, apps=None, cfg=None):
+        super().__init__(parent)
+        self.apps = apps
+        self.cfg = cfg
 
         self.setFixedSize(1015, 570)
         self.setWindowTitle("Rebecca Plugin")
@@ -46,7 +47,7 @@ class PassportPlugin(QWidget):
                 Qt.TransformationMode.SmoothTransformation
             )
             palette = self.palette()
-            palette.setBrush(self.backgroundRole(), pixmap)
+            palette.setBrush(QPalette.ColorRole.Window, QBrush(pixmap))  # ✅ QBrush
             self.setAutoFillBackground(True)
             self.setPalette(palette)
 
@@ -131,6 +132,6 @@ class PassportPlugin(QWidget):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = RebeccaPlugin()
+    window = PassportPlugin()
     window.show()
     sys.exit(app.exec())
