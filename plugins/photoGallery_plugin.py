@@ -14,6 +14,7 @@ Polished plugin:
 import os
 import sys
 import uuid
+import socket
 from datetime import datetime
 from functools import partial
 
@@ -690,9 +691,17 @@ class ImageEditorDialog(QDialog):
             final = self.apply_all_layers_to_image(self.working)
             final.convert("RGB").save(self.image_path)
             self.base_image = final.copy(); self.working = final.copy()
+        #Sock code for Companion rebecca see rebecca.json for event_map
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            sock.sendto(json.dumps({"type":"user_good"}).encode(), "/tmp/rebecca.sock")
+            sock.close()            
             self.layers = []; self.selected_layer_id = None
             if self.on_saved_callback: self.on_saved_callback()
             QMessageBox.information(self, "Saved", f"Saved: {self.image_path}")
+        #Sock code for Companion rebecca see rebecca.json for event_map
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            sock.sendto(json.dumps({"type":"user_good"}).encode(), "/tmp/rebecca.sock")
+            sock.close()            
             self.update_display()
         except Exception as e:
             QMessageBox.warning(self, "Save failed", str(e))
@@ -701,12 +710,20 @@ class ImageEditorDialog(QDialog):
         try:
             final = self.apply_all_layers_to_image(self.working)
             ext = os.path.splitext(self.image_path)[1].lower() or ".jpg"
+        #Sock code for Companion rebecca see rebecca.json for event_map
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            sock.sendto(json.dumps({"type":"user_good"}).encode(), "/tmp/rebecca.sock")
+            sock.close()            
             fname = f"photo_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}{ext}"
             fpath = os.path.join(PHOTO_FOLDER, fname)
             ensure_folder()
             final.convert("RGB").save(fpath)
             if self.on_saved_callback: self.on_saved_callback()
             QMessageBox.information(self, "Saved As New", f"Saved new file: {fpath}")
+        #Sock code for Companion rebecca see rebecca.json for event_map
+            sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+            sock.sendto(json.dumps({"type":"user_good"}).encode(), "/tmp/rebecca.sock")
+            sock.close()
         except Exception as e:
             QMessageBox.warning(self, "Save failed", str(e))
 
@@ -754,6 +771,10 @@ class ImageEditorDialog(QDialog):
 # ---------------- Gallery Plugin ----------------
 class PhotoGalleryPlugin(QWidget):
     def __init__(self, parent=None, apps=None, cfg=None):
+    #Sock code for Companion rebecca see rebecca.json for event_map
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+        sock.sendto(json.dumps({"type":"user_good"}).encode(), "/tmp/rebecca.sock")
+        sock.close()
         super().__init__(parent)
         self.setFixedSize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.move(0,0)
