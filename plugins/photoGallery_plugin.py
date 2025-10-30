@@ -724,7 +724,7 @@ class ImageEditorDialog(QDialog):
             QMessageBox.information(self, "Saved As New", f"Saved new file: {fpath}")
         #Sock code for Companion rebecca see rebecca.json for event_map
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
-            sock.sendto(json.dumps({"type":"save_data"}).encode(), "/tmp/rebecca.sock")
+            sock.sendto(json.dumps({"type":"user_motivated"}).encode(), "/tmp/rebecca.sock")
             sock.close()
         except Exception as e:
             QMessageBox.warning(self, "Save failed", str(e))
