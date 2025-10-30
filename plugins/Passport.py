@@ -22,8 +22,8 @@ FRAME_W, FRAME_H = 350, 350
 
 # Other positions
 NAME_Y = 70
-MOOD_Y = 180
-LEVEL_Y = 320
+MOOD_Y = 190
+LEVEL_Y = 325
 PROGRESS_X, PROGRESS_Y = 473, 410
 PROGRESS_W, PROGRESS_H = 495, 66
 
@@ -60,21 +60,21 @@ class PassportPlugin(QWidget):
         self.name_label.setText(self.rebecca_data.get("name", {}).get("firstname", "Unknown"))
         self.name_label.move(0, NAME_Y)
         self.name_label.setFixedWidth(self.width())
-        self.name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.name_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.mood_label = QLabel(self)
         self.mood_label.setFont(QFont("Arial", 60))
         self.mood_label.setText(f"Mood: {self.rebecca_xp.get('mood', 'Neutral')}")
         self.mood_label.move(0, MOOD_Y)
         self.mood_label.setFixedWidth(self.width())
-        self.mood_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.mood_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         self.level_label = QLabel(self)
         self.level_label.setFont(QFont("Arial", 60))
         self.level_label.setText(f"Level: {self.rebecca_xp.get('level', 0)}")
         self.level_label.move(0, LEVEL_Y)
         self.level_label.setFixedWidth(self.width())
-        self.level_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.level_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         # Progress bar
         self.progress = QProgressBar(self)
