@@ -812,7 +812,7 @@ class PhotoGalleryPlugin(QWidget):
                 continue
             thumb = img.copy(); thumb.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
             qpix = pil_to_qpixmap(thumb)
-            lbl = ClickableLabel(); lbl.setFixedSize(QSize(THUMBNAIL_SIZE[0]+10,THUMBNAIL_SIZE[1]+10))
+            lbl = ClickableLabel(); lbl.setFixedSize(QSize(THUMBNAIL_SIZE[0]+1,THUMBNAIL_SIZE[1]+1))
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter); lbl.setPixmap(qpix)
             lbl.clicked.connect(partial(self.open_editor, path))
             #cap = QLabel(fname); cap.setStyleSheet("color:white;"); cap.setAlignment(Qt.AlignmentFlag.AlignCenter)
