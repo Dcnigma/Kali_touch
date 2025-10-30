@@ -815,8 +815,8 @@ class PhotoGalleryPlugin(QWidget):
             lbl = ClickableLabel(); lbl.setFixedSize(QSize(THUMBNAIL_SIZE[0]+8,THUMBNAIL_SIZE[1]+8))
             lbl.setAlignment(Qt.AlignmentFlag.AlignCenter); lbl.setPixmap(qpix)
             lbl.clicked.connect(partial(self.open_editor, path))
-            cap = QLabel(fname); cap.setStyleSheet("color:white;"); cap.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            cont = QWidget(); vbox = QVBoxLayout(cont); vbox.addWidget(lbl); vbox.addWidget(cap)
+            #cap = QLabel(fname); cap.setStyleSheet("color:white;"); cap.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            cont = QWidget(); vbox = QVBoxLayout(cont); vbox.addWidget(lbl); #vbox.addWidget(cap)
             self.grid.addWidget(cont, row, col)
             col += 1
             if col >= cols:
