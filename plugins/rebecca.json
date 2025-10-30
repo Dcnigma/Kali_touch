@@ -1,5 +1,5 @@
 {
-  "images_dir": "oLed/rebecca/faces_rebecca",
+  "images_dir": "/home/kali/overlay_launcher/plugins/oLed/rebecca/faces_rebecca",
 
   "states": {
     "LOOK_AROUND": {
