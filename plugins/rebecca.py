@@ -24,7 +24,20 @@ class Display:
         self.base = Path(base)
         self.cache = {}
         self.bg = Image.new("RGBA", device.size, "white")
-
+        
+        self.xpdata = load_json(XP_STORE, {"xp":0, "level":0})
+        
+        # Ensure required keys exist
+        if "mood" not in self.xpdata:
+            self.xpdata["mood"] = "Happy"
+        if "level" not in self.xpdata:
+            self.xpdata["level"] = 0
+        if "xp" not in self.xpdata:
+            self.xpdata["xp"] = 0
+        
+        # Save back in case new keys were added
+        save_json(XP_STORE, self.xpdata)
+    
     def load(self, f):
         p = self.base / f
         if f not in self.cache:
