@@ -32,7 +32,7 @@ from PyQt6.QtCore import Qt, QSize, pyqtSignal, QTimer, QPoint
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
 PHOTO_FOLDER = os.path.join(plugin_folder, "/home/kali/Pictures/SavedPictures")
 
-THUMBNAIL_SIZE = (290, 230)
+THUMBNAIL_SIZE = (310, 240)
 WINDOW_WIDTH = 1015
 WINDOW_HEIGHT = 550
 SUPPORTED_EXTS = (".jpg", ".jpeg", ".png", ".bmp", ".gif")
@@ -263,12 +263,12 @@ class ImageEditorDialog(QDialog):
 
         tb.addWidget(QLabel(" "))  # spacer
 
-        # color pickers act on selected layer or default
-        b_text_color = make_icon_btn("🎨","Text Color"); b_text_color.clicked.connect(self.choose_text_color); tb.addWidget(b_text_color)
-        b_fill = make_icon_btn("🩸","Fill Color"); b_fill.clicked.connect(self.choose_fill_color); tb.addWidget(b_fill)
-        b_stroke = make_icon_btn("✏️","Stroke Color"); b_stroke.clicked.connect(self.choose_stroke_color); tb.addWidget(b_stroke)
+        # color pickers act on selected layer or default Don't need this
+     #   b_text_color = make_icon_btn("🎨","Text Color"); b_text_color.clicked.connect(self.choose_text_color); tb.addWidget(b_text_color)
+     #   b_fill = make_icon_btn("🩸","Fill Color"); b_fill.clicked.connect(self.choose_fill_color); tb.addWidget(b_fill)
+     #   b_stroke = make_icon_btn("✏️","Stroke Color"); b_stroke.clicked.connect(self.choose_stroke_color); tb.addWidget(b_stroke)
 
-        tb.addWidget(QLabel(" "))
+     #   tb.addWidget(QLabel(" "))
 
         b_save = make_icon_btn("💾","Save (overwrite)"); b_save.clicked.connect(self.save_overwrite); tb.addWidget(b_save)
         b_save_new = make_icon_btn("🆕","Save As New"); b_save_new.clicked.connect(self.save_as_new); tb.addWidget(b_save_new)
