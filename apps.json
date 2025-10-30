@@ -21,13 +21,19 @@
   "x": 1,
   "y": 0
   },
-    "Metasploit": {
-    "cmd": "/usr/share/kali-menu/helper-scripts/metasploit-framework.sh",
-    "touch_icon": "icons/Textedit.png",
-    "x": 0,
-    "y": 0,
-    "width": 940,
-    "height": 800
+  "Plugin Template": {
+  "plugin": "plugins.Plugin_Template:PluginTemplate",
+  "touch_icon": "icons/photos.png",
+  "x": 1,
+  "y": 0
+  },  
+  "Metasploit": {
+  "cmd": "/usr/share/kali-menu/helper-scripts/metasploit-framework.sh",
+  "touch_icon": "icons/Textedit.png",
+  "x": 0,
+  "y": 0,
+  "width": 940,
+  "height": 800
   },
   "Mozilla Firefox": {
     "cmd": "firefox",
