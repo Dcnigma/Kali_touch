@@ -10,12 +10,43 @@ SOCKET_PATH = "/tmp/rebecca.sock"
 
 # ---------------- helpers -----------------
 def load_json(p, default):
+    """Load JSON from file; return default if file missing or invalid."""
     if p.exists():
-        return json.loads(p.read_text())
+        try:
+            return json.loads(p.read_text())
+        except json.JSONDecodeError as e:
+            print(f"⚠️ Warning: Invalid JSON in {p.name}, using default. Error: {e}")
+            return default
     return default
 
 def save_json(p, data):
+    """Save JSON to file with indent=2."""
     p.write_text(json.dumps(data, indent=2))
+
+def validate_rebecca_json(data):
+    """Ensure required keys exist in rebecca.json"""
+    changed = False
+    if "name" not in data:
+        data["name"] = {"firstname": "Rebecca"}
+        changed = True
+    if "levels" not in data:
+        data["levels"] = [0, 50, 150, 350, 700, 1200]
+        changed = True
+    return changed, data
+
+def validate_rebecca_xp_json(data):
+    """Ensure required keys exist in rebecca_xp.json"""
+    changed = False
+    if "xp" not in data:
+        data["xp"] = 0
+        changed = True
+    if "level" not in data:
+        data["level"] = 0
+        changed = True
+    if "mood" not in data:
+        data["mood"] = "Happy"
+        changed = True
+    return changed, data
 
 # ---------------- display -----------------
 class Display:
@@ -46,10 +77,22 @@ class Rebecca(threading.Thread):
         self.display = Display(device, cfg["images_dir"])
         self.state = "LOOK_AROUND"
         self.running = True
-        self.xpdata = load_json(XP_STORE, {"xp":0,"level":0})
         self.last_xp_tick = time.time()
         self.last_input = time.time()
         self.state_start = time.time()  # track state start
+
+        # ---------------- JSON loading & validation ----------------
+        # rebecca.json
+        self.rebecca_data = load_json(CONFIG_PATH, {})
+        changed, self.rebecca_data = validate_rebecca_json(self.rebecca_data)
+        if changed:
+            save_json(CONFIG_PATH, self.rebecca_data)
+
+        # rebecca_xp.json
+        self.xpdata = load_json(XP_STORE, {"xp":0, "level":0, "mood":"Happy"})
+        changed, self.xpdata = validate_rebecca_xp_json(self.xpdata)
+        if changed:
+            save_json(XP_STORE, self.xpdata)
 
     def set_state(self, new_state):
         """Switch state and store start time"""
@@ -90,15 +133,14 @@ class Rebecca(threading.Thread):
                 self.add_xp(self.cfg["leveling"]["xp_per_minute_running"])
                 self.last_xp_tick = time.time()
 
-            # idle detection: fallback if no monitor
+            # idle detection
             if time.time() - self.last_input > 60*5:
                 self.set_state(self.cfg["event_map"].get("idle_long","SAD"))
 
             sconf = self.cfg["states"][self.state]
             t = sconf["type"]
-            state_name = self.state  # store current state
+            state_name = self.state
 
-            # ---- return-to-idle timer ----
             rti = sconf.get("return_to_idle_after")
             if rti and time.time() - self.state_start > rti:
                 self.set_state("LOOK_AROUND")
@@ -125,7 +167,6 @@ class Rebecca(threading.Thread):
                     for f in sconf["frames"]:
                         if self.state != state_name:
                             break
-                        # check return-to-idle
                         if rti and time.time() - self.state_start > rti:
                             self.set_state("LOOK_AROUND")
                             break
@@ -162,11 +203,8 @@ class EventListener(threading.Thread):
                 except Exception as e:
                     print("socket error:", e)
 
-# ---------------- idle/screensaver monitor 🆕 -----------------
+# ---------------- idle/screensaver monitor -----------------
 def idle_monitor(rebecca, check_interval=5):
-    """
-    Multi-level idle detection using xprintidle.
-    """
     active = True
     thresholds = rebecca.cfg.get("idle_thresholds", {})
     short_idle = thresholds.get("short_idle", 30000)
@@ -176,16 +214,13 @@ def idle_monitor(rebecca, check_interval=5):
     while True:
         try:
             idle_ms = int(subprocess.check_output(["xprintidle"]))
-            # screensaver / very long idle
             if idle_ms >= screensaver_idle:
                 rebecca.event("screensaver_on")
-            # long idle
             elif idle_ms >= long_idle:
                 rebecca.event("idle_long")
-            # short idle
             elif idle_ms >= short_idle:
                 rebecca.event("look_around")
-            # user returned
+
             if idle_ms < short_idle and not active:
                 rebecca.event("screensaver_off")
                 active = True
@@ -205,7 +240,6 @@ if __name__ == "__main__":
     listener = EventListener(r)
     listener.start()
 
-    # 🆕 start idle/screensaver monitoring
     threading.Thread(target=idle_monitor, args=(r,), daemon=True).start()
 
     print("Rebecca running — send JSON events to /tmp/rebecca.sock")
