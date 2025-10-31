@@ -92,9 +92,9 @@ class PassportPlugin(QWidget):
         # Rounded XP bar style
         self.progress.setStyleSheet("""
             QProgressBar {
-                border: 2px solid #555;
-                border-radius: 30px;
-                background-color: #f0f0f0;
+                border: 3px solid #000000;
+                border-radius: 5px;
+                background-color: #90B082;
                 text-align: center;
                 font: 24px 'Arial';
                 color: black;
