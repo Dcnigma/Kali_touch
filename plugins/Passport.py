@@ -20,6 +20,10 @@ LEVELS = [0, 50, 150, 350, 700, 1200]
 
 FRAME_W, FRAME_H = 350, 350
 
+# Set precise position here
+FACE_X = 100
+FACE_Y = 80
+
 
 class PassportPlugin(QWidget):
     def __init__(self, parent=None, apps=None, cfg=None):
@@ -46,12 +50,12 @@ class PassportPlugin(QWidget):
         # ---------------------- Load JSON ----------------------
         self.load_json_data()
 
-        # ---------------------- Layout ----------------------
-        self.main_layout = QHBoxLayout(self)
-        self.main_layout.setContentsMargins(50, 50, 50, 50)
+        # ---------------------- Face with precise X/Y ----------------------
+        self.face_container = QWidget(self)
+        self.face_container.setFixedSize(FRAME_W, FRAME_H)
+        self.face_container.move(FACE_X, FACE_Y)  # <-- precise position
 
-        # Left: Face image
-        self.face_label = QLabel()
+        self.face_label = QLabel(self.face_container)
         self.face_label.setFixedSize(FRAME_W, FRAME_H)
         self.face_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.face_label.setStyleSheet("""
@@ -59,6 +63,7 @@ class PassportPlugin(QWidget):
             border: 15px solid #000;
             overflow: hidden;
         """)
+
         self.face_images = self.load_face_images()
         self.face_cycle = cycle(self.face_images)
         self.update_face()
@@ -67,10 +72,10 @@ class PassportPlugin(QWidget):
         self.face_timer.timeout.connect(self.update_face)
         self.face_timer.start(1000)
 
-        self.main_layout.addWidget(self.face_label)
-
-        # Right: Labels and progress bar
-        self.right_layout = QVBoxLayout()
+        # ---------------------- Right layout for labels & progress ----------------------
+        self.right_layout_widget = QWidget(self)
+        self.right_layout_widget.setGeometry(470, 50, 500, 500)  # Fixed area for layout
+        self.right_layout = QVBoxLayout(self.right_layout_widget)
         self.right_layout.setSpacing(20)
 
         self.name_label = QLabel(self.rebecca_data.get("name", {}).get("firstname", "Unknown"))
@@ -119,8 +124,6 @@ class PassportPlugin(QWidget):
             }
         """)
         self.right_layout.addWidget(self.progress)
-
-        self.main_layout.addLayout(self.right_layout)
 
         # ---------------------- Close Button ----------------------
         self.close_btn = QPushButton("Close", self)
