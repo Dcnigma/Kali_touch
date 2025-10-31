@@ -39,7 +39,8 @@ class PassportPlugin(QWidget):
         self.cfg = cfg
 
         self.setFixedSize(1015, 570)
-        self.setWindowTitle("Rebecca Plugin")
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
+        self.showFullScreen()
 
         # ---------------------- Background ----------------------
         bg_path = os.path.join(plugin_folder, "passport.png")
