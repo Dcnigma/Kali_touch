@@ -4,7 +4,7 @@ import sys
 import json
 from itertools import cycle
 from PyQt6.QtWidgets import QWidget, QLabel, QProgressBar, QApplication
-from PyQt6.QtGui import QPixmap, QFont
+from PyQt6.QtGui import QPixmap, QFont, QPalette, QBrush
 from PyQt6.QtCore import Qt, QTimer
 
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
@@ -34,56 +34,49 @@ class PassportPlugin(QWidget):
     def __init__(self):
         super().__init__()
 
+        # ---------------------- Load JSON ----------------------
+        self.load_json_data()
+
         # ---------------------- Fullscreen without title ----------------------
         self.setWindowFlag(Qt.WindowType.FramelessWindowHint)
         self.showFullScreen()
 
-        screen_rect = QApplication.primaryScreen().geometry()
-        self.screen_w, self.screen_h = screen_rect.width(), screen_rect.height()
-        self.setFixedSize(self.screen_w, self.screen_h)
-
-        # ---------------------- Load JSON ----------------------
-        self.load_json_data()
-
         # ---------------------- Background ----------------------
         bg_path = os.path.join(plugin_folder, "passport.png")
-        self.bg_label = QLabel(self)
-        self.bg_label.setGeometry(0, 0, self.screen_w, self.screen_h)
         if os.path.exists(bg_path):
             pixmap = QPixmap(bg_path).scaled(
-                self.screen_w, self.screen_h,
+                self.size(),
                 Qt.AspectRatioMode.KeepAspectRatioByExpanding,
                 Qt.TransformationMode.SmoothTransformation
             )
-            self.bg_label.setPixmap(pixmap)
-        self.bg_label.lower()  # send to back
+            palette = QPalette()
+            palette.setBrush(QPalette.ColorRole.Window, QBrush(pixmap))
+            self.setPalette(palette)
+            self.setAutoFillBackground(True)
 
         # ---------------------- Name ----------------------
         self.name_label = QLabel(self)
         self.name_label.setFont(QFont("Arial", 60))
         self.name_label.setText(self.rebecca_data.get("name", {}).get("firstname", "Unknown"))
         self.name_label.move(NAME_X, NAME_Y)
-        self.name_label.setFixedWidth(self.screen_w)
+        self.name_label.setFixedWidth(self.width())
         self.name_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.name_label.raise_()
 
         # ---------------------- Mood ----------------------
         self.mood_label = QLabel(self)
         self.mood_label.setFont(QFont("Arial", 60))
         self.mood_label.setText(f"Mood: {self.rebecca_xp.get('mood', 'Neutral')}")
         self.mood_label.move(MOOD_X, MOOD_Y)
-        self.mood_label.setFixedWidth(self.screen_w)
+        self.mood_label.setFixedWidth(self.width())
         self.mood_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.mood_label.raise_()
 
         # ---------------------- Level ----------------------
         self.level_label = QLabel(self)
         self.level_label.setFont(QFont("Arial", 60))
         self.level_label.setText(f"Level: {self.rebecca_xp.get('level', 0)}")
         self.level_label.move(LEVEL_X, LEVEL_Y)
-        self.level_label.setFixedWidth(self.screen_w)
+        self.level_label.setFixedWidth(self.width())
         self.level_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.level_label.raise_()
 
         # ---------------------- XP Bar ----------------------
         self.progress = QProgressBar(self)
@@ -109,16 +102,12 @@ class PassportPlugin(QWidget):
                 );
             }
         """)
-        self.progress.raise_()
 
         # ---------------------- Face Frame ----------------------
         self.face_label = QLabel(self)
         self.face_label.setGeometry(FRAME_X, FRAME_Y, FRAME_W, FRAME_H)
         self.face_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.face_label.setStyleSheet("""
-            border-radius: 15px;
-        """)
-        self.face_label.raise_()
+        self.face_label.setStyleSheet("border-radius: 15px;")
 
         self.face_images = self.load_face_images()
         self.face_cycle = cycle(self.face_images)
