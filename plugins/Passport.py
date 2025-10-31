@@ -47,8 +47,8 @@ class PassportPlugin(QWidget):
         self.load_json_data()
 
         # ---------------------- Layout ----------------------
-        self.main_layout = QHBoxLayout(self)
-        self.main_layout.setContentsMargins(50, 50, 50, 50)
+       # self.main_layout = QHBoxLayout(self)
+       # self.main_layout.setContentsMargins(50, 50, 50, 50)
 
         # Left: Face image
         self.face_label = QLabel()
@@ -67,7 +67,7 @@ class PassportPlugin(QWidget):
         self.face_timer.timeout.connect(self.update_face)
         self.face_timer.start(1000)
 
-        self.main_layout.addWidget(self.face_label)
+      #  self.main_layout.addWidget(self.face_label)
 
         # Right: Labels and progress bar
         self.right_layout = QVBoxLayout()
