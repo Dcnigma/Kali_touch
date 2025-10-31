@@ -14,16 +14,13 @@ REBECCA_JSON = os.path.join(plugin_folder, "rebecca.json")
 REBECCA_XP_JSON = os.path.join(plugin_folder, "rebecca_xp.json")
 FACES_DIR = os.path.join(plugin_folder, "oLed", "rebecca", "faces_rebecca")
 
-# Photo frame positions & size
+# Positions & sizes
 FRAME_X, FRAME_Y = 77, 70
 FRAME_W, FRAME_H = 350, 350
 
-# Text positions
-NAME_Y = 60
-MOOD_Y = 170
-LEVEL_Y = 300
-
-# Progress bar position & size
+NAME_X, NAME_Y = 473, 60
+MOOD_X, MOOD_Y = 473, 170
+LEVEL_X, LEVEL_Y = 473, 300
 PROGRESS_X, PROGRESS_Y = 464, 433
 PROGRESS_W, PROGRESS_H = 516, 68
 
@@ -46,43 +43,42 @@ class PassportPlugin(QWidget):
         self.bg_label.setGeometry(0, 0, self.width(), self.height())
         if os.path.exists(bg_path):
             pixmap = QPixmap(bg_path).scaled(
-                self.size(),
-                Qt.AspectRatioMode.IgnoreAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
+                self.size(), Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation
             )
             self.bg_label.setPixmap(pixmap)
 
         # ---------------------- Load JSON ----------------------
         self.load_json_data()
 
-        # ---------------------- Name Label ----------------------
+        # ---------------------- Labels ----------------------
+        # Name (static)
         self.name_label = QLabel(self)
         self.name_label.setFont(QFont("Arial", 60))
-        self.name_label.move(473, NAME_Y)
+        self.name_label.setText(self.rebecca_data.get("name", {}).get("firstname", "Unknown"))
+        self.name_label.move(NAME_X, NAME_Y)
         self.name_label.setFixedWidth(self.width())
         self.name_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.name_label.setStyleSheet("color: white;")
-        self.update_name(self.rebecca_data.get("name", {}).get("firstname", "Unknown"))
 
-        # ---------------------- Mood Label ----------------------
+        # Mood (dynamic)
         self.mood_label = QLabel(self)
         self.mood_label.setFont(QFont("Arial", 60))
-        self.mood_label.move(473, MOOD_Y)
+        self.mood_label.move(MOOD_X, MOOD_Y)
         self.mood_label.setFixedWidth(self.width())
         self.mood_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.mood_label.setStyleSheet("color: white;")
         self.update_mood(self.rebecca_xp.get("mood", "Neutral"))
 
-        # ---------------------- Level Label ----------------------
+        # Level (static)
         self.level_label = QLabel(self)
         self.level_label.setFont(QFont("Arial", 60))
-        self.level_label.move(473, LEVEL_Y)
+        self.level_label.setText(f"Level: {self.rebecca_xp.get('level', 0)}")
+        self.level_label.move(LEVEL_X, LEVEL_Y)
         self.level_label.setFixedWidth(self.width())
         self.level_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.level_label.setStyleSheet("color: white;")
-        self.update_level(self.rebecca_xp.get("level", 0))
 
-        # ---------------------- Progress Bar ----------------------
+        # ---------------------- XP Bar (dynamic) ----------------------
         self.progress = QProgressBar(self)
         self.progress.setGeometry(PROGRESS_X, PROGRESS_Y, PROGRESS_W, PROGRESS_H)
         self.progress.setMaximum(LEVELS[-1])
@@ -108,7 +104,7 @@ class PassportPlugin(QWidget):
         """)
         self.update_xp(self.rebecca_xp.get("xp", 0))
 
-        # ---------------------- Face Frame ----------------------
+        # ---------------------- Face ----------------------
         self.face_label = QLabel(self)
         self.face_label.setGeometry(FRAME_X, FRAME_Y, FRAME_W, FRAME_H)
         self.face_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -120,7 +116,6 @@ class PassportPlugin(QWidget):
         self.face_cycle = cycle(self.face_images)
         self.update_face()
 
-        # Cycle timer
         self.face_timer = QTimer()
         self.face_timer.timeout.connect(self.update_face)
         self.face_timer.start(1000)
@@ -130,7 +125,7 @@ class PassportPlugin(QWidget):
         self.close_btn.setGeometry(self.width() - 120, 20, 100, 40)
         self.close_btn.clicked.connect(self.close)
 
-    # ---------------------- JSON Loading ----------------------
+    # ---------------------- JSON ----------------------
     def load_json_data(self):
         self.rebecca_data = {}
         self.rebecca_xp = {}
@@ -141,16 +136,14 @@ class PassportPlugin(QWidget):
             with open(REBECCA_XP_JSON, "r") as f:
                 self.rebecca_xp = json.load(f)
 
-    # ---------------------- Face Animation ----------------------
+    # ---------------------- Face ----------------------
     def load_face_images(self):
         images = []
         for filename in ["LOOK_L.png", "LOOK_R.png", "LOOK_R_HAPPY.png", "LOOK_L_HAPPY.png"]:
             path = os.path.join(FACES_DIR, filename)
             if os.path.exists(path):
                 pixmap = QPixmap(path).scaled(
-                    FRAME_W, FRAME_H,
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation
+                    FRAME_W, FRAME_H, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
                 )
                 images.append(pixmap)
         return images
@@ -158,22 +151,11 @@ class PassportPlugin(QWidget):
     def update_face(self):
         if self.face_images:
             pixmap = next(self.face_cycle)
-            self.face_label.setPixmap(pixmap.scaled(
-                self.face_label.width(),
-                self.face_label.height(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation
-            ))
+            self.face_label.setPixmap(pixmap)
 
-    # ---------------------- Update Methods ----------------------
-    def update_name(self, new_name: str):
-        self.name_label.setText(new_name)
-
+    # ---------------------- Dynamic Updates ----------------------
     def update_mood(self, new_mood: str):
         self.mood_label.setText(f"Mood: {new_mood}")
-
-    def update_level(self, new_level: int):
-        self.level_label.setText(f"Level: {new_level}")
 
     def update_xp(self, new_xp: int):
         self.progress.setValue(new_xp)
