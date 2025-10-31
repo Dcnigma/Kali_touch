@@ -62,8 +62,9 @@ class PassportPlugin(QWidget):
         self.face_label.setStyleSheet("""
             border-radius: 15px;
             border: 15px solid #000;
-            overflow: hidden;
+            
         """)
+        self.face_label.setScaledContents(True)  # makes sure the pixmap fits inside
 
         self.face_images = self.load_face_images()
         self.face_cycle = cycle(self.face_images)
