@@ -113,7 +113,7 @@ class PassportPlugin(QWidget):
         self.face_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.face_label.setStyleSheet("""
             border-radius: 175px;  /* Rounded photo */
-            border: 3px solid #444;
+            border: 30px solid #000;
             overflow: hidden;
         """)
 
