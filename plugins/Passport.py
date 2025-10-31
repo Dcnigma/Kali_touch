@@ -38,7 +38,7 @@ class PassportPlugin(QWidget):
         self.apps = apps
         self.cfg = cfg
 
-        self.setFixedSize(1015, 600)
+        self.setFixedSize(1020, 600)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.showFullScreen()
 
