@@ -27,7 +27,7 @@ class PassportPlugin(QWidget):
         self.apps = apps
         self.cfg = cfg
 
-        self.setFixedSize(1015, 570)
+        self.setFixedSize(1015, 590)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.showFullScreen()
 
@@ -47,8 +47,8 @@ class PassportPlugin(QWidget):
         self.load_json_data()
 
         # ---------------------- Layout ----------------------
-       # self.main_layout = QHBoxLayout(self)
-       # self.main_layout.setContentsMargins(50, 50, 50, 50)
+        self.main_layout = QHBoxLayout(self)
+        self.main_layout.setContentsMargins(50, 50, 50, 50)
 
         # Left: Face image
         self.face_label = QLabel()
