@@ -16,7 +16,7 @@ REBECCA_JSON = os.path.join(plugin_folder, "rebecca.json")
 REBECCA_XP_JSON = os.path.join(plugin_folder, "rebecca_xp.json")
 FACES_DIR = os.path.join(plugin_folder, "oLed", "rebecca", "faces_rebecca")
 
-# Photo frame positions & size
+# Photo frame positions & size (relative to top-left corner)
 FRAME_X, FRAME_Y = 77, 70
 FRAME_W, FRAME_H = 350, 350
 
@@ -38,15 +38,15 @@ class PassportPlugin(QWidget):
         self.apps = apps
         self.cfg = cfg
 
-        # Frameless fixed window, no title, no close button
-        self.setFixedSize(1015, 570)
+        # Frameless, full screen
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
+        self.showFullScreen()
 
         # ---------------------- Background ----------------------
         bg_path = os.path.join(plugin_folder, "passport.png")
         if os.path.exists(bg_path):
             pixmap = QPixmap(bg_path).scaled(
-                self.size(),
+                self.screen().size(),  # scale to fullscreen
                 Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
@@ -64,7 +64,7 @@ class PassportPlugin(QWidget):
         self.name_label.setFont(QFont("Arial", 60))
         self.name_label.setText(self.rebecca_data.get("name", {}).get("firstname", "Unknown"))
         self.name_label.move(473, NAME_Y)
-        self.name_label.setFixedWidth(self.width())
+        self.name_label.setFixedWidth(self.screen().size().width())
         self.name_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         # Mood label
@@ -72,7 +72,7 @@ class PassportPlugin(QWidget):
         self.mood_label.setFont(QFont("Arial", 60))
         self.mood_label.setText(f"Mood: {self.rebecca_xp.get('mood', 'Neutral')}")
         self.mood_label.move(473, MOOD_Y)
-        self.mood_label.setFixedWidth(self.width())
+        self.mood_label.setFixedWidth(self.screen().size().width())
         self.mood_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         # Level label
@@ -80,7 +80,7 @@ class PassportPlugin(QWidget):
         self.level_label.setFont(QFont("Arial", 60))
         self.level_label.setText(f"Level: {self.rebecca_xp.get('level', 0)}")
         self.level_label.move(473, LEVEL_Y)
-        self.level_label.setFixedWidth(self.width())
+        self.level_label.setFixedWidth(self.screen().size().width())
         self.level_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         # ---------------------- Progress Bar ----------------------
@@ -128,7 +128,7 @@ class PassportPlugin(QWidget):
         # Cycle timer
         self.face_timer = QTimer()
         self.face_timer.timeout.connect(self.update_face)
-        self.face_timer.start(1000)  # 1 second per frame
+        self.face_timer.start(1000)
 
     # ---------------------- JSON Loading ----------------------
     def load_json_data(self):
