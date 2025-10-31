@@ -106,7 +106,7 @@ class PassportPlugin(QWidget):
                 x1: 0, y1: 0, x2: 1, y2: 0,
                 stop: 0 #47CC00, stop: 1 #3D8F11
                 );
- #               margin: 0px;
+                margin: 0.5px;
             }
         """)
         
