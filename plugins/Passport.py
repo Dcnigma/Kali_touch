@@ -4,7 +4,7 @@ import sys
 import json
 from itertools import cycle
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QPushButton, QApplication, QProgressBar, QVBoxLayout, QHBoxLayout, QSpacerItem, QSizePolicy
+    QWidget, QLabel, QPushButton, QApplication, QProgressBar
 )
 from PyQt6.QtGui import QPixmap, QFont
 from PyQt6.QtCore import Qt, QTimer
@@ -18,7 +18,16 @@ FACES_DIR = os.path.join(plugin_folder, "oLed", "rebecca", "faces_rebecca")
 
 LEVELS = [0, 50, 150, 350, 700, 1200]
 
+# Face frame size
 FRAME_W, FRAME_H = 350, 350
+
+# Precise positions (adjust these as needed)
+FACE_X, FACE_Y = 77, 70
+NAME_X, NAME_Y = 473, 60
+MOOD_X, MOOD_Y = 473, 170
+LEVEL_X, LEVEL_Y = 473, 300
+PROGRESS_X, PROGRESS_Y, PROGRESS_W, PROGRESS_H = 460, 410, 517, 67
+CLOSE_X, CLOSE_Y, CLOSE_W, CLOSE_H = 895, 20, 100, 40
 
 
 class PassportPlugin(QWidget):
@@ -46,19 +55,16 @@ class PassportPlugin(QWidget):
         # ---------------------- Load JSON ----------------------
         self.load_json_data()
 
-        # ---------------------- Layout ----------------------
-        self.main_layout = QHBoxLayout(self)
-        self.main_layout.setContentsMargins(50, 50, 50, 50)
-
-        # Left: Face image
-        self.face_label = QLabel()
-        self.face_label.setFixedSize(FRAME_W, FRAME_H)
+        # ---------------------- Face ----------------------
+        self.face_label = QLabel(self)
+        self.face_label.setGeometry(FACE_X, FACE_Y, FRAME_W, FRAME_H)
         self.face_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.face_label.setStyleSheet("""
             border-radius: 15px;
             border: 15px solid #000;
             overflow: hidden;
         """)
+
         self.face_images = self.load_face_images()
         self.face_cycle = cycle(self.face_images)
         self.update_face()
@@ -67,34 +73,28 @@ class PassportPlugin(QWidget):
         self.face_timer.timeout.connect(self.update_face)
         self.face_timer.start(1000)
 
-        self.main_layout.addWidget(self.face_label)
-
-        # Right: Labels and progress bar
-        self.right_layout = QVBoxLayout()
-        self.right_layout.setSpacing(20)
-
-        self.name_label = QLabel(self.rebecca_data.get("name", {}).get("firstname", "Unknown"))
+        # ---------------------- Labels ----------------------
+        self.name_label = QLabel(self)
+        self.name_label.setText(self.rebecca_data.get("name", {}).get("firstname", "Unknown"))
         self.name_label.setFont(QFont("Arial", 60))
         self.name_label.setStyleSheet("color: white;")
-        self.name_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.right_layout.addWidget(self.name_label)
+        self.name_label.setGeometry(NAME_X, NAME_Y, 500, 70)
 
-        self.mood_label = QLabel(f"Mood: {self.rebecca_xp.get('mood', 'Neutral')}")
+        self.mood_label = QLabel(self)
+        self.mood_label.setText(f"Mood: {self.rebecca_xp.get('mood', 'Neutral')}")
         self.mood_label.setFont(QFont("Arial", 60))
         self.mood_label.setStyleSheet("color: white;")
-        self.mood_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.right_layout.addWidget(self.mood_label)
+        self.mood_label.setGeometry(MOOD_X, MOOD_Y, 500, 70)
 
-        self.level_label = QLabel(f"Level: {self.rebecca_xp.get('level', 0)}")
+        self.level_label = QLabel(self)
+        self.level_label.setText(f"Level: {self.rebecca_xp.get('level', 0)}")
         self.level_label.setFont(QFont("Arial", 60))
         self.level_label.setStyleSheet("color: white;")
-        self.level_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.right_layout.addWidget(self.level_label)
+        self.level_label.setGeometry(LEVEL_X, LEVEL_Y, 500, 70)
 
-        # Spacer before progress bar
-        self.right_layout.addSpacerItem(QSpacerItem(0, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-
-        self.progress = QProgressBar()
+        # ---------------------- Progress Bar ----------------------
+        self.progress = QProgressBar(self)
+        self.progress.setGeometry(PROGRESS_X, PROGRESS_Y, PROGRESS_W, PROGRESS_H)
         self.progress.setMaximum(LEVELS[-1])
         self.progress.setValue(self.rebecca_xp.get("xp", 0))
         self.progress.setFormat("XP: %v/%m")
@@ -118,13 +118,10 @@ class PassportPlugin(QWidget):
                 margin: 0.01px;
             }
         """)
-        self.right_layout.addWidget(self.progress)
-
-        self.main_layout.addLayout(self.right_layout)
 
         # ---------------------- Close Button ----------------------
         self.close_btn = QPushButton("Close", self)
-        self.close_btn.setGeometry(self.width() - 120, 20, 100, 40)
+        self.close_btn.setGeometry(CLOSE_X, CLOSE_Y, CLOSE_W, CLOSE_H)
         self.close_btn.clicked.connect(self.close)
         self.close_btn.show()
 
