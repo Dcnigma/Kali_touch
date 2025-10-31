@@ -4,7 +4,7 @@ import sys
 import json
 from itertools import cycle
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QPushButton, QApplication, QProgressBar
+    QWidget, QLabel, QApplication, QProgressBar
 )
 from PyQt6.QtGui import QPixmap, QFont, QBrush, QPalette
 from PyQt6.QtCore import Qt, QTimer
@@ -38,9 +38,8 @@ class PassportPlugin(QWidget):
         self.apps = apps
         self.cfg = cfg
 
-        # Frameless fixed window
+        # Frameless fixed window, no title, no close button
         self.setFixedSize(1015, 570)
-        self.setWindowTitle("Rebecca Plugin")
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
 
         # ---------------------- Background ----------------------
