@@ -20,11 +20,12 @@ FACES_DIR = os.path.join(plugin_folder, "oLed", "rebecca", "faces_rebecca")
 FRAME_X, FRAME_Y = 77, 70
 FRAME_W, FRAME_H = 350, 350
 
-# Other positions
+# Text positions
 NAME_Y = 60
 MOOD_Y = 170
 LEVEL_Y = 300
 
+# Progress bar position & size
 PROGRESS_X, PROGRESS_Y = 473, 410
 PROGRESS_W, PROGRESS_H = 495, 66
 
@@ -48,7 +49,7 @@ class PassportPlugin(QWidget):
                 Qt.TransformationMode.SmoothTransformation
             )
             palette = self.palette()
-            palette.setBrush(QPalette.ColorRole.Window, QBrush(pixmap))  # ✅ QBrush
+            palette.setBrush(QPalette.ColorRole.Window, QBrush(pixmap))
             self.setAutoFillBackground(True)
             self.setPalette(palette)
 
@@ -56,6 +57,7 @@ class PassportPlugin(QWidget):
         self.load_json_data()
 
         # ---------------------- UI Elements ----------------------
+        # Name label
         self.name_label = QLabel(self)
         self.name_label.setFont(QFont("Arial", 60))
         self.name_label.setText(self.rebecca_data.get("name", {}).get("firstname", "Unknown"))
@@ -63,6 +65,7 @@ class PassportPlugin(QWidget):
         self.name_label.setFixedWidth(self.width())
         self.name_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
+        # Mood label
         self.mood_label = QLabel(self)
         self.mood_label.setFont(QFont("Arial", 60))
         self.mood_label.setText(f"Mood: {self.rebecca_xp.get('mood', 'Neutral')}")
@@ -70,6 +73,7 @@ class PassportPlugin(QWidget):
         self.mood_label.setFixedWidth(self.width())
         self.mood_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
+        # Level label
         self.level_label = QLabel(self)
         self.level_label.setFont(QFont("Arial", 60))
         self.level_label.setText(f"Level: {self.rebecca_xp.get('level', 0)}")
@@ -77,7 +81,7 @@ class PassportPlugin(QWidget):
         self.level_label.setFixedWidth(self.width())
         self.level_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        # Progress bar
+        # ---------------------- Progress Bar ----------------------
         self.progress = QProgressBar(self)
         self.progress.setGeometry(PROGRESS_X, PROGRESS_Y, PROGRESS_W, PROGRESS_H)
         self.progress.setMaximum(LEVELS[-1])
@@ -85,19 +89,43 @@ class PassportPlugin(QWidget):
         self.progress.setFormat("XP: %v/%m")
         self.progress.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Photo frame (animated faces)
+        # Rounded XP bar style
+        self.progress.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid #555;
+                border-radius: 30px;
+                background-color: #f0f0f0;
+                text-align: center;
+                font: 24px 'Arial';
+                color: black;
+            }
+            QProgressBar::chunk {
+                border-radius: 30px;
+                background-color: #00aaff;
+                margin: 2px;
+            }
+        """)
+
+        # ---------------------- Face Frame ----------------------
         self.face_label = QLabel(self)
         self.face_label.setGeometry(FRAME_X, FRAME_Y, FRAME_W, FRAME_H)
         self.face_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.face_label.setStyleSheet("""
+            border-radius: 175px;  /* Rounded photo */
+            border: 3px solid #444;
+            overflow: hidden;
+        """)
 
         self.face_images = self.load_face_images()
         self.face_cycle = cycle(self.face_images)
         self.update_face()
+
+        # Cycle timer
         self.face_timer = QTimer()
         self.face_timer.timeout.connect(self.update_face)
-        self.face_timer.start(1000)  # 1 second per face
+        self.face_timer.start(1000)  # 1 second per frame
 
-        # Close button
+        # ---------------------- Close Button ----------------------
         self.close_btn = QPushButton("Close", self)
         self.close_btn.setGeometry(self.width() - 120, 20, 100, 40)
         self.close_btn.clicked.connect(self.close)
@@ -131,6 +159,7 @@ class PassportPlugin(QWidget):
             self.face_label.setPixmap(next(self.face_cycle))
 
 
+# ---------------------- Entry Point ----------------------
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = PassportPlugin()
