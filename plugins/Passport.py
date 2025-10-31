@@ -18,12 +18,12 @@ FACES_DIR = os.path.join(plugin_folder, "oLed", "rebecca", "faces_rebecca")
 DESIGN_W, DESIGN_H = 1015, 570
 
 # Element positions/sizes in design
-FRAME_X, FRAME_Y, FRAME_W, FRAME_H = 77, 70, 350, 350
-NAME_X, NAME_Y = 473, 60
-MOOD_X, MOOD_Y = 473, 170
-LEVEL_X, LEVEL_Y = 473, 300
-PROGRESS_X, PROGRESS_Y, PROGRESS_W, PROGRESS_H = 460, 410, 517, 67
-LEVELS = [0, 50, 150, 350, 700, 1200]
+FRAME_X, FRAME_Y, FRAME_W, FRAME_H = 0, 0, 0, 0
+NAME_X, NAME_Y = 0, 0
+MOOD_X, MOOD_Y = 0, 0
+LEVEL_X, LEVEL_Y = 0, 0
+PROGRESS_X, PROGRESS_Y, PROGRESS_W, PROGRESS_H = 0, 0, 0, 0
+LEVELS = [0, 50, 150, 350, 700, 1200, 1500]
 
 class PassportPlugin(QWidget):
     def __init__(self):
