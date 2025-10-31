@@ -4,9 +4,9 @@ import sys
 import json
 from itertools import cycle
 from PyQt6.QtWidgets import (
-    QWidget, QLabel, QPushButton, QApplication, QProgressBar
+    QWidget, QLabel, QPushButton, QApplication, QProgressBar, QVBoxLayout
 )
-from PyQt6.QtGui import QPixmap, QFont, QBrush, QPalette
+from PyQt6.QtGui import QPixmap, QFont
 from PyQt6.QtCore import Qt, QTimer
 
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
@@ -44,15 +44,15 @@ class PassportPlugin(QWidget):
 
         # ---------------------- Background ----------------------
         bg_path = os.path.join(plugin_folder, "passport.png")
+        self.bg_label = QLabel(self)
+        self.bg_label.setGeometry(0, 0, self.width(), self.height())
         if os.path.exists(bg_path):
             pixmap = QPixmap(bg_path).scaled(
                 self.size(), Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
-            palette = self.palette()
-            palette.setBrush(QPalette.ColorRole.Window, QBrush(pixmap))
-            self.setAutoFillBackground(True)
-            self.setPalette(palette)
+            self.bg_label.setPixmap(pixmap)
+        self.bg_label.show()
 
         # ---------------------- Load JSON ----------------------
         self.load_json_data()
@@ -65,6 +65,8 @@ class PassportPlugin(QWidget):
         self.name_label.move(473, NAME_Y)
         self.name_label.setFixedWidth(self.width())
         self.name_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.name_label.setStyleSheet("color: white;")
+        self.name_label.show()
 
         # Mood label
         self.mood_label = QLabel(self)
@@ -73,6 +75,8 @@ class PassportPlugin(QWidget):
         self.mood_label.move(473, MOOD_Y)
         self.mood_label.setFixedWidth(self.width())
         self.mood_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.mood_label.setStyleSheet("color: white;")
+        self.mood_label.show()
 
         # Level label
         self.level_label = QLabel(self)
@@ -81,6 +85,8 @@ class PassportPlugin(QWidget):
         self.level_label.move(473, LEVEL_Y)
         self.level_label.setFixedWidth(self.width())
         self.level_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.level_label.setStyleSheet("color: white;")
+        self.level_label.show()
 
         # ---------------------- Progress Bar ----------------------
         self.progress = QProgressBar(self)
@@ -89,8 +95,6 @@ class PassportPlugin(QWidget):
         self.progress.setValue(self.rebecca_xp.get("xp", 0))
         self.progress.setFormat("XP: %v/%m")
         self.progress.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        # Rounded XP bar style
         self.progress.setStyleSheet("""
             QProgressBar {
                 border: 3px solid #000000;
@@ -110,16 +114,18 @@ class PassportPlugin(QWidget):
                 margin: 0.01px;
             }
         """)
-        
+        self.progress.show()
+
         # ---------------------- Face Frame ----------------------
         self.face_label = QLabel(self)
         self.face_label.setGeometry(FRAME_X, FRAME_Y, FRAME_W, FRAME_H)
         self.face_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.face_label.setStyleSheet("""
-            border-radius: 15px;  /* Rounded photo */
-            border: 15 solid #000;
+            border-radius: 15px;  
+            border: 15px solid #000;
             overflow: hidden;
         """)
+        self.face_label.show()
 
         self.face_images = self.load_face_images()
         self.face_cycle = cycle(self.face_images)
@@ -128,12 +134,13 @@ class PassportPlugin(QWidget):
         # Cycle timer
         self.face_timer = QTimer()
         self.face_timer.timeout.connect(self.update_face)
-        self.face_timer.start(1000)  # 1 second per frame
+        self.face_timer.start(1000)
 
         # ---------------------- Close Button ----------------------
         self.close_btn = QPushButton("Close", self)
         self.close_btn.setGeometry(self.width() - 120, 20, 100, 40)
         self.close_btn.clicked.connect(self.close)
+        self.close_btn.show()
 
     # ---------------------- JSON Loading ----------------------
     def load_json_data(self):
