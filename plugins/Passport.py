@@ -93,7 +93,7 @@ class PassportPlugin(QWidget):
         self.progress.setStyleSheet("""
             QProgressBar {
                 border: 3px solid #000000;
-                border-radius: 5px;
+                border-radius: 15px;
                 background-color: #90B082;
                 text-align: center;
                 font: 24px 'Arial';
