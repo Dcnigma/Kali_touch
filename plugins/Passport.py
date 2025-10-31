@@ -119,9 +119,9 @@ class PassportPlugin(QWidget):
                 margin: 0.01px;
             }
         """)
-        self.right_layout.addWidget(self.progress)
+#        self.right_layout.addWidget(self.progress)
 
-        self.main_layout.addLayout(self.right_layout)
+#        self.main_layout.addLayout(self.right_layout)
 
         # ---------------------- Close Button ----------------------
         self.close_btn = QPushButton("Close", self)
