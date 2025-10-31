@@ -29,7 +29,7 @@ LEVEL_Y = 300
 PROGRESS_X, PROGRESS_Y = 460, 410
 PROGRESS_W, PROGRESS_H = 517, 67
 
-LEVELS = [0, 50, 150, 350, 700, 1200]
+LEVELS = [0, 50, 150, 350, 700, 1200, 1500]
 
 
 class PassportPlugin(QWidget):
@@ -38,7 +38,7 @@ class PassportPlugin(QWidget):
         self.apps = apps
         self.cfg = cfg
 
-        self.setFixedSize(1015, 570)
+        self.setFixedSize(1015, 600)
         self.setWindowFlags(Qt.WindowType.FramelessWindowHint | Qt.WindowType.WindowStaysOnTopHint)
         self.showFullScreen()
 
