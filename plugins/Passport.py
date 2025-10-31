@@ -95,7 +95,7 @@ class PassportPlugin(QWidget):
         #self.right_layout.addSpacerItem(QSpacerItem(0, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
         self.progress = QProgressBar()
-        self.close_btn.setGeometry(self.width() - 120, 20, 100, 40)
+        self.progress.setGeometry(self.width() - 120, 20, 100, 40)
         self.progress.setMaximum(LEVELS[-1])
         self.progress.setValue(self.rebecca_xp.get("xp", 0))
         self.progress.setFormat("XP: %v/%m")
