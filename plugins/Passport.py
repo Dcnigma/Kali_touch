@@ -3,8 +3,10 @@ import os
 import sys
 import json
 from itertools import cycle
-from PyQt6.QtWidgets import QWidget, QLabel, QProgressBar, QApplication
-from PyQt6.QtGui import QPixmap, QFont, QKeyEvent
+from PyQt6.QtWidgets import (
+    QWidget, QLabel, QPushButton, QApplication, QProgressBar
+)
+from PyQt6.QtGui import QPixmap, QFont, QBrush, QPalette
 from PyQt6.QtCore import Qt, QTimer
 
 plugin_folder = os.path.dirname(os.path.abspath(__file__))
@@ -31,51 +33,53 @@ LEVELS = [0, 50, 150, 350, 700, 1200]
 
 
 class PassportPlugin(QWidget):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, parent=None, apps=None, cfg=None):
+        super().__init__(parent)
+        self.apps = apps
+        self.cfg = cfg
 
-        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
-        self.showFullScreen()  # True fullscreen
-
-        self.load_json_data()
+        self.setFixedSize(1015, 570)
+        self.setWindowTitle("Rebecca Plugin")
 
         # ---------------------- Background ----------------------
         bg_path = os.path.join(plugin_folder, "passport.png")
-        self.bg_label = QLabel(self)
         if os.path.exists(bg_path):
             pixmap = QPixmap(bg_path).scaled(
-                self.size(),
-                Qt.AspectRatioMode.IgnoreAspectRatio,
+                self.size(), Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
-            self.bg_label.setPixmap(pixmap)
-        self.bg_label.setGeometry(0, 0, self.width(), self.height())
-        self.bg_label.lower()  # ensures it's behind all other widgets
+            palette = self.palette()
+            palette.setBrush(QPalette.ColorRole.Window, QBrush(pixmap))
+            self.setAutoFillBackground(True)
+            self.setPalette(palette)
 
-        # ---------------------- Labels ----------------------
+        # ---------------------- Load JSON ----------------------
+        self.load_json_data()
+
+        # ---------------------- UI Elements ----------------------
+        # Name label
         self.name_label = QLabel(self)
         self.name_label.setFont(QFont("Arial", 60))
         self.name_label.setText(self.rebecca_data.get("name", {}).get("firstname", "Unknown"))
         self.name_label.move(473, NAME_Y)
         self.name_label.setFixedWidth(self.width())
         self.name_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.name_label.raise_()
 
+        # Mood label
         self.mood_label = QLabel(self)
         self.mood_label.setFont(QFont("Arial", 60))
         self.mood_label.setText(f"Mood: {self.rebecca_xp.get('mood', 'Neutral')}")
         self.mood_label.move(473, MOOD_Y)
         self.mood_label.setFixedWidth(self.width())
         self.mood_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.mood_label.raise_()
 
+        # Level label
         self.level_label = QLabel(self)
         self.level_label.setFont(QFont("Arial", 60))
         self.level_label.setText(f"Level: {self.rebecca_xp.get('level', 0)}")
         self.level_label.move(473, LEVEL_Y)
         self.level_label.setFixedWidth(self.width())
         self.level_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.level_label.raise_()
 
         # ---------------------- Progress Bar ----------------------
         self.progress = QProgressBar(self)
@@ -84,6 +88,8 @@ class PassportPlugin(QWidget):
         self.progress.setValue(self.rebecca_xp.get("xp", 0))
         self.progress.setFormat("XP: %v/%m")
         self.progress.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # Rounded XP bar style
         self.progress.setStyleSheet("""
             QProgressBar {
                 border: 3px solid #000000;
@@ -94,30 +100,41 @@ class PassportPlugin(QWidget):
                 color: white;
             }
             QProgressBar::chunk {
+                border: 5px solid #000000;            
                 border-radius: 15px;
                 background-color: qlineargradient(
-                    x1: 0, y1: 0, x2: 1, y2: 0,
-                    stop: 0 #47CC00, stop: 1 #3D8F11
+                x1: 0, y1: 0, x2: 1, y2: 0,
+                stop: 0 #47CC00, stop: 1 #3D8F11
                 );
                 margin: 0.01px;
             }
         """)
-        self.progress.raise_()
-
+        
         # ---------------------- Face Frame ----------------------
         self.face_label = QLabel(self)
         self.face_label.setGeometry(FRAME_X, FRAME_Y, FRAME_W, FRAME_H)
         self.face_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.face_label.setStyleSheet("border-radius:15px;")
-        self.face_label.raise_()
+        self.face_label.setStyleSheet("""
+            border-radius: 15px;  /* Rounded photo */
+            border: 15 solid #000;
+            overflow: hidden;
+        """)
 
         self.face_images = self.load_face_images()
         self.face_cycle = cycle(self.face_images)
         self.update_face()
+
+        # Cycle timer
         self.face_timer = QTimer()
         self.face_timer.timeout.connect(self.update_face)
-        self.face_timer.start(1000)
+        self.face_timer.start(1000)  # 1 second per frame
 
+        # ---------------------- Close Button ----------------------
+        self.close_btn = QPushButton("Close", self)
+        self.close_btn.setGeometry(self.width() - 120, 20, 100, 40)
+        self.close_btn.clicked.connect(self.close)
+
+    # ---------------------- JSON Loading ----------------------
     def load_json_data(self):
         self.rebecca_data = {}
         self.rebecca_xp = {}
@@ -127,18 +144,15 @@ class PassportPlugin(QWidget):
         if os.path.exists(REBECCA_XP_JSON):
             with open(REBECCA_XP_JSON, "r") as f:
                 self.rebecca_xp = json.load(f)
-        print(f"Loaded name={self.rebecca_data.get('name', {}).get('firstname','?')}, "
-              f"mood={self.rebecca_xp.get('mood','?')}, "
-              f"level={self.rebecca_xp.get('level',0)}, xp={self.rebecca_xp.get('xp',0)}")
 
+    # ---------------------- Face Animation ----------------------
     def load_face_images(self):
         images = []
         for filename in ["LOOK_L.png", "LOOK_R.png", "LOOK_R_HAPPY.png", "LOOK_L_HAPPY.png"]:
             path = os.path.join(FACES_DIR, filename)
             if os.path.exists(path):
                 pixmap = QPixmap(path).scaled(
-                    FRAME_W, FRAME_H,
-                    Qt.AspectRatioMode.KeepAspectRatio,
+                    FRAME_W, FRAME_H, Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation
                 )
                 images.append(pixmap)
@@ -148,12 +162,8 @@ class PassportPlugin(QWidget):
         if self.face_images:
             self.face_label.setPixmap(next(self.face_cycle))
 
-    # ---------------------- ESC exit ----------------------
-    def keyPressEvent(self, event: QKeyEvent):
-        if event.key() == Qt.Key.Key_Escape:
-            self.close()
 
-
+# ---------------------- Entry Point ----------------------
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = PassportPlugin()
