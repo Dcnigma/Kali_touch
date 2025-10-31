@@ -27,7 +27,7 @@ LEVEL_Y = 300
 
 # Progress bar position & size
 PROGRESS_X, PROGRESS_Y = 460, 410
-PROGRESS_W, PROGRESS_H = 515, 67
+PROGRESS_W, PROGRESS_H = 517, 67
 
 LEVELS = [0, 50, 150, 350, 700, 1200]
 
@@ -115,7 +115,7 @@ class PassportPlugin(QWidget):
         self.face_label.setGeometry(FRAME_X, FRAME_Y, FRAME_W, FRAME_H)
         self.face_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.face_label.setStyleSheet("""
-            border-radius: 5px;  /* Rounded photo */
+            border-radius: 15px;  /* Rounded photo */
             border: 15 solid #000;
             overflow: hidden;
         """)
