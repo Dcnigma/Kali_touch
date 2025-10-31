@@ -38,14 +38,17 @@ class PassportPlugin(QWidget):
         self.apps = apps
         self.cfg = cfg
 
+        # Frameless fixed window
         self.setFixedSize(1015, 570)
         self.setWindowTitle("Rebecca Plugin")
+        self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
 
         # ---------------------- Background ----------------------
         bg_path = os.path.join(plugin_folder, "passport.png")
         if os.path.exists(bg_path):
             pixmap = QPixmap(bg_path).scaled(
-                self.size(), Qt.AspectRatioMode.IgnoreAspectRatio,
+                self.size(),
+                Qt.AspectRatioMode.IgnoreAspectRatio,
                 Qt.TransformationMode.SmoothTransformation
             )
             palette = self.palette()
@@ -100,24 +103,23 @@ class PassportPlugin(QWidget):
                 color: white;
             }
             QProgressBar::chunk {
-                border: 5px solid #000000;            
+                border: 5px solid #000000;
                 border-radius: 15px;
                 background-color: qlineargradient(
-                x1: 0, y1: 0, x2: 1, y2: 0,
-                stop: 0 #47CC00, stop: 1 #3D8F11
+                    x1: 0, y1: 0, x2: 1, y2: 0,
+                    stop: 0 #47CC00, stop: 1 #3D8F11
                 );
                 margin: 0.01px;
             }
         """)
-        
+
         # ---------------------- Face Frame ----------------------
         self.face_label = QLabel(self)
         self.face_label.setGeometry(FRAME_X, FRAME_Y, FRAME_W, FRAME_H)
         self.face_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.face_label.setStyleSheet("""
-            border-radius: 15px;  /* Rounded photo */
-            border: 15 solid #000;
-            overflow: hidden;
+            border-radius: 15px;
+            border: 15px solid #000;
         """)
 
         self.face_images = self.load_face_images()
@@ -128,11 +130,6 @@ class PassportPlugin(QWidget):
         self.face_timer = QTimer()
         self.face_timer.timeout.connect(self.update_face)
         self.face_timer.start(1000)  # 1 second per frame
-
-        # ---------------------- Close Button ----------------------
-        self.close_btn = QPushButton("Close", self)
-        self.close_btn.setGeometry(self.width() - 120, 20, 100, 40)
-        self.close_btn.clicked.connect(self.close)
 
     # ---------------------- JSON Loading ----------------------
     def load_json_data(self):
@@ -152,7 +149,8 @@ class PassportPlugin(QWidget):
             path = os.path.join(FACES_DIR, filename)
             if os.path.exists(path):
                 pixmap = QPixmap(path).scaled(
-                    FRAME_W, FRAME_H, Qt.AspectRatioMode.KeepAspectRatio,
+                    FRAME_W, FRAME_H,
+                    Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation
                 )
                 images.append(pixmap)
@@ -161,6 +159,11 @@ class PassportPlugin(QWidget):
     def update_face(self):
         if self.face_images:
             self.face_label.setPixmap(next(self.face_cycle))
+
+    # ---------------------- Key Bindings ----------------------
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            QApplication.quit()
 
 
 # ---------------------- Entry Point ----------------------
