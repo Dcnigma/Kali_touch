@@ -17,7 +17,7 @@ REBECCA_XP_JSON = os.path.join(plugin_folder, "rebecca_xp.json")
 FACES_DIR = os.path.join(plugin_folder, "oLed", "rebecca", "faces_rebecca")
 
 # Photo frame positions & size
-FRAME_X, FRAME_Y = 77, 70
+FRAME_X, FRAME_Y = 79, 80
 FRAME_W, FRAME_H = 350, 350
 
 # Text positions
@@ -169,7 +169,7 @@ class PassportPlugin(QWidget):
     def update_face(self):
         if self.face_images:
             self.face_label.setPixmap(next(self.face_cycle))
-
+            
 
 # ---------------------- Entry Point ----------------------
 if __name__ == "__main__":
