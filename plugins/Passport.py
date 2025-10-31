@@ -100,11 +100,11 @@ class PassportPlugin(QWidget):
                 color: black;
             }
             QProgressBar::chunk {
-                border: 3px solid #000000;            
-                border-radius: 5px;
+                border: 30px solid #000000;            
+                border-radius: 15px;
                 background-color: qlineargradient(
                 x1: 0, y1: 0, x2: 1, y2: 0,
-                stop: 0 #00aaff, stop: 1 #0088cc
+                stop: 0 #47CC00, stop: 1 #3D8F11
                 );
                 margin: 15px;
             }
