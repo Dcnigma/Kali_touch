@@ -94,10 +94,10 @@ class PassportPlugin(QWidget):
             QProgressBar {
                 border: 3px solid #000000;
                 border-radius: 15px;
-                background-color: #90B082;
+                background-color: #9CED21;
                 text-align: center;
                 font: 24px 'Arial';
-                color: black;
+                color: white;
             }
             QProgressBar::chunk {
                 border: 3px solid #000000;            
@@ -106,7 +106,7 @@ class PassportPlugin(QWidget):
                 x1: 0, y1: 0, x2: 1, y2: 0,
                 stop: 0 #47CC00, stop: 1 #3D8F11
                 );
-                margin: 0.5px;
+                margin: 0.1px;
             }
         """)
         
@@ -115,8 +115,8 @@ class PassportPlugin(QWidget):
         self.face_label.setGeometry(FRAME_X, FRAME_Y, FRAME_W, FRAME_H)
         self.face_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.face_label.setStyleSheet("""
-            border-radius: 175px;  /* Rounded photo */
-            border: 30px solid #000;
+            border-radius: 5px;  /* Rounded photo */
+            border: 15 solid #000;
             overflow: hidden;
         """)
 
